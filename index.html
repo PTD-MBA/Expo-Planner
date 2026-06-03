@@ -283,6 +283,9 @@ let resizing = false;
 
 let undoStack = [];
 let isRestoringState = false;
+let autosaveTimer = null;
+let lastAutosaveAt = null;
+const AUTOSAVE_KEY = "expoPlannerAutosaveV1";
 let activePaintKeys = new Set();
 let paintingRect = false;
 let paintRectStart = null;
@@ -355,6 +358,103 @@ function undoLastAction(){
   restoreSnapshot(snapshot);
 }
 
+
+
+
+function getLayoutState(){
+  return {
+    app: "Expo Planner",
+    version: "1.5",
+    savedAt: new Date().toISOString(),
+    state: createSnapshot()
+  };
+}
+
+function applyLayoutState(layout){
+  const snapshot = layout && layout.state ? layout.state : layout;
+  if (!snapshot) throw new Error("Layoutfilen mangler data.");
+
+  restoreSnapshot(snapshot);
+  setup.style.display = "none";
+  toolbar.style.display = "flex";
+  saveAutosaveNow();
+}
+
+function downloadTextFile(filename, text){
+  const blob = new Blob([text], { type: "application/json;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.download = filename;
+  link.href = url;
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function saveLayout(){
+  saveAutosaveNow();
+
+  const now = new Date();
+  const stamp = now.toISOString().slice(0,19).replace(/[:T]/g,"-");
+  downloadTextFile(`expo-planner-${stamp}.json`, JSON.stringify(getLayoutState(), null, 2));
+}
+
+function saveAutosaveNow(){
+  try {
+    localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(getLayoutState()));
+    lastAutosaveAt = new Date();
+  } catch (err) {
+    console.warn("Autosave kunne ikke gemmes", err);
+  }
+}
+
+function scheduleAutosave(){
+  if (isRestoringState) return;
+  clearTimeout(autosaveTimer);
+  autosaveTimer = setTimeout(saveAutosaveNow, 400);
+}
+
+function tryRestoreAutosave(){
+  try {
+    const raw = localStorage.getItem(AUTOSAVE_KEY);
+    if (!raw) return;
+
+    const layout = JSON.parse(raw);
+    const savedAt = layout.savedAt ? new Date(layout.savedAt) : null;
+    const label = savedAt && !Number.isNaN(savedAt.getTime())
+      ? savedAt.toLocaleString("da-DK")
+      : "ukendt tidspunkt";
+
+    if (confirm(`Der findes en autosave fra ${label}. Vil du åbne den?`)) {
+      applyLayoutState(layout);
+    }
+  } catch (err) {
+    console.warn("Autosave kunne ikke indlæses", err);
+  }
+}
+
+function loadLayoutFile(file){
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const layout = JSON.parse(reader.result);
+      applyLayoutState(layout);
+    } catch (err) {
+      alert("Layoutfilen kunne ikke indlæses. Vælg en gyldig Expo Planner .json-fil.");
+      console.error(err);
+    } finally {
+      fileInput.value = "";
+    }
+  };
+  reader.onerror = () => {
+    alert("Filen kunne ikke læses.");
+    fileInput.value = "";
+  };
+  reader.readAsText(file);
+}
+
+fileInput.addEventListener("change", e => loadLayoutFile(e.target.files[0]));
 
 function showNew(){
   document.getElementById("newSetup").style.display="flex";
@@ -1066,7 +1166,11 @@ function render(){
 
     canvas.appendChild(el);
   });
+
+  scheduleAutosave();
 }
+
+tryRestoreAutosave();
 </script>
 
 </body>
