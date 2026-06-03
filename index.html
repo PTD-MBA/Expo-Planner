@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="da">
+<head>
+<meta charset="UTF-8">
+<title>Messe Stand Planner</title>
+
+<!-- ✅ KORREKT script -->
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+
+<style>
+body {
+  margin: 0;
+  font-family: "Segoe UI", Arial, sans-serif;
+  background: #f1f5f9;
+}
+
+/* ✅ toolbar (starter skjult) */
+.toolbar {
+  display: none;
+  position: fixed;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  gap: 10px;
+  padding: 10px 15px;
+  border-radius: 12px;
+
+  background: rgba(255,255,255,0.85);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 8px 20px rgba(0,0,0,0.1);
+}
+
+/* buttons */
+button {
+  border: none;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: #3b82f6;
+  color: white;
+  cursor: pointer;
+}
+button:hover { transform: translateY(-1px); }
+
+/* canvas */
+#canvas {
+  position: relative;
+  margin: 100px auto;
+  border-radius: 16px;
+  background: white;
+  box-shadow: 0 20px 40px rgba(0,0,0,0.08);
+
+  background-size: 40px 40px;
+  background-image:
+    linear-gradient(to right,#e5e7eb 1px,transparent 1px),
+    linear-gradient(to bottom,#e5e7eb 1px,transparent 1px);
+}
+
+/* box */
+.box {
+  position: absolute;
+  border-radius: 10px;
+  color: white;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+
+  padding: 6px;
+  cursor: move;
+  font-size: 12px;
+
+  box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+}
+
+.selected { outline: 3px solid red; }
+
+.resizer {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: white;
+  right: -4px;
+  bottom: -4px;
+  border: 2px solid black;
+  cursor: se-resize;
+}
+
+input.name-input {
+  width: 100%;
+  border: none;
+  text-align: center;
+  background: rgba(255,255,255,0.85);
+}
+
+/* start screen */
+#setup {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+#setupBox {
+  background: white;
+  padding: 20px;
+  border-radius: 12px;
+  width: 260px;
+  text-align: center;
+}
+</style>
+</head>
+
+<body>
+
+<!-- ✅ START SKÆRM -->
+<div id="setup">
+  <div id="setupBox">
+    <h3>Messe Planner</h3>
+
+    <button onclick="showNew()">🆕 Opret nyt</button>
+    <button onclick="fileInput.click()">📂 Indlæs layout</button>
+
+    <div id="newSetup" style="display:none">
+      Width (m): <input id="widthInput" type="number" value="0">
+      Height (m): <input id="heightInput" type="number" value="0">
+      <button onclick="initCanvas()">Start</button>
+    </div>
+  </div>
+</div>
+
+<div class="toolbar">
+  <button onclick="addBox()">➕</button>
+  <button onclick="removeSelected()">🗑</button>
+  <button onclick="saveLayout()">💾</button>
+  <button onclick="fileInput.click()">📂</button>
+  <button onclick="exportImage()">🖼</button>
+  <input type="file" id="fileInput" hidden>
+</div>
+
+<div id="canvas"></div>
+
+<script>
+const GRID_SIZE=40;
+const PX_TO_METER=1/40;
+
+const canvas=document.getElementById("canvas");
+const fileInput=document.getElementById("fileInput");
+const setup=document.getElementById("setup");
+const toolbar=document.querySelector(".toolbar");
+
+let canvasWidthM=47;
+let canvasHeightM=17;
+
+let items=[];
+let selectedId=null;
+let nextId=1;
+
+let currentItem=null;
+let dragging=false;
+let resizing=false;
+
+const snap=v=>Math.round(v/GRID_SIZE)*GRID_SIZE;
+
+// UI
+function showNew(){
+  newSetup.style.display="block";
+}
+
+// canvas
+function updateCanvasSize(){
+  canvas.style.width=canvasWidthM*GRID_SIZE+"px";
+  canvas.style.height=canvasHeightM*GRID_SIZE+"px";
+}
+
+function initCanvas(){
+  canvasWidthM=widthInput.value;
+  canvasHeightM=heightInput.value;
+
+  updateCanvasSize();
+
+  setup.style.display="none";
+  toolbar.style.display="flex"; // ✅ vis toolbar
+
+  render();
+}
+
+// add/remove
+function addBox(){
+  items.push({
+    id:nextId++,
+    x:0,y:0,w:80,h:80,
+    name:"Ny stand",
+    color:"#3b82f6"
+  });
+  render();
+}
+
+function removeSelected(){
+  items=items.filter(i=>i.id!==selectedId);
+  selectedId=null;
+  render();
+}
+
+// save/load
+function saveLayout(){
+  const data=JSON.stringify({
+    items,
+    widthM:canvasWidthM,
+    heightM:canvasHeightM
+  });
+
+  const blob=new Blob([data]);
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(blob);
+  a.download="layout.json";
+  a.click();
+}
+
+fileInput.addEventListener("change", e=>{
+  const file=e.target.files[0];
+  if(!file) return;
+
+  const reader=new FileReader();
+  reader.onload=evt=>{
+    const data=JSON.parse(evt.target.result);
+
+    items=data.items||[];
+    canvasWidthM=data.widthM||20;
+    canvasHeightM=data.heightM||20;
+
+    updateCanvasSize();
+
+    nextId=Math.max(...items.map(i=>i.id),0)+1;
+
+    setup.style.display="none";
+    toolbar.style.display="flex"; // ✅ vis toolbar
+
+    render();
+  };
+  reader.readAsText(file);
+});
+
+// export
+function exportImage(){
+  const old=selectedId;
+  selectedId=null;
+  render();
+
+  html2canvas(canvas,{
+    scale:2,
+    onclone:(doc)=>{
+      doc.querySelectorAll("input").forEach(i=>{
+        const d=doc.createElement("div");
+        d.innerText=i.value;
+        d.style.textAlign="center";
+        i.replaceWith(d);
+      });
+    }
+  }).then(c=>{
+    const a=document.createElement("a");
+    a.href=c.toDataURL();
+    a.download="image.png";
+    a.click();
+
+    selectedId=old;
+    render();
+  });
+}
+
+// mouse
+document.addEventListener("mousemove",e=>{
+  if(!currentItem) return;
+
+  const r=canvas.getBoundingClientRect();
+  const x=e.clientX-r.left;
+  const y=e.clientY-r.top;
+
+  if(dragging){
+    let nx=snap(x-currentItem.w/2);
+    let ny=snap(y-currentItem.h/2);
+
+    nx=Math.min(Math.max(0,nx), canvasWidthM*GRID_SIZE-currentItem.w);
+    ny=Math.min(Math.max(0,ny), canvasHeightM*GRID_SIZE-currentItem.h);
+
+    currentItem.x=nx;
+    currentItem.y=ny;
+    render();
+  }
+
+  if(resizing){
+    let nw=snap(x-currentItem.x);
+    let nh=snap(y-currentItem.y);
+
+    const maxW=canvasWidthM*GRID_SIZE-currentItem.x;
+    const maxH=canvasHeightM*GRID_SIZE-currentItem.y;
+
+    nw=snap(Math.min(nw,maxW));
+    nh=snap(Math.min(nh,maxH));
+
+    currentItem.w=nw;
+    currentItem.h=nh;
+    render();
+  }
+});
+
+document.addEventListener("mouseup",()=>{
+  dragging=false;
+  resizing=false;
+  currentItem=null;
+});
+
+// render
+function render(){
+  canvas.innerHTML="";
+
+  items.forEach(item=>{
+    const el=document.createElement("div");
+    el.className="box";
+    el.style.background=item.color;
+
+    if(item.id===selectedId) el.classList.add("selected");
+
+    el.style.left=item.x+"px";
+    el.style.top=item.y+"px";
+    el.style.width=item.w+"px";
+    el.style.height=item.h+"px";
+
+    const name=document.createElement("input");
+    name.value=item.name;
+    name.className="name-input";
+
+    name.addEventListener("mousedown",e=>e.stopPropagation());
+    name.addEventListener("focus",()=>{
+      dragging=false;
+      resizing=false;
+      currentItem=null;
+    });
+    name.addEventListener("input",e=>item.name=e.target.value);
+
+    const size=document.createElement("div");
+    size.innerText=
+      (item.w*PX_TO_METER).toFixed(1)+" × "+
+      (item.h*PX_TO_METER).toFixed(1)+" m";
+
+    el.addEventListener("mousedown",e=>{
+      if(e.target.tagName==="INPUT") return;
+
+      dragging=true;
+      currentItem=item;
+      selectedId=item.id;
+      render();
+    });
+
+    const r=document.createElement("div");
+    r.className="resizer";
+
+    r.addEventListener("mousedown",e=>{
+      e.stopPropagation();
+      resizing=true;
+      dragging=false;
+      currentItem=item;
+      selectedId=item.id;
+    });
+
+    el.appendChild(name);
+    el.appendChild(size);
+    el.appendChild(r);
+
+    canvas.appendChild(el);
+  });
+}
+
+canvas.addEventListener("click",()=>{
+  selectedId=null;
+  render();
+});
+</script>
+
+</body>
+</html>
