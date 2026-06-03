@@ -2,7 +2,7 @@
 <html lang="da">
 <head>
 <meta charset="UTF-8">
-<title>Expo Planner - V.1.1</title>
+<title>Expo Planner - V.1.3</title>
 
 <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 
@@ -63,6 +63,20 @@ button {
   inset: 0;
   background: rgba(34,197,94,0.08);
   pointer-events: none;
+}
+
+.paint-rect-preview {
+  position: absolute;
+  box-sizing: border-box;
+  border: 2px dashed #111827;
+  background: rgba(59,130,246,0.18);
+  pointer-events: none;
+  z-index: 5;
+}
+
+.paint-rect-preview.erase {
+  background: rgba(239,68,68,0.16);
+  border-color: #ef4444;
 }
 
 /* ✅ NEW */
@@ -192,11 +206,11 @@ input.name-input {
 
 <div class="toolbar">
   <button onclick="addBox()">➕</button>
-  <button onclick="removeSelected()">🗑</button>
-  <button onclick="saveLayout()">💾</button>
+    <button onclick="saveLayout()">💾</button>
+  <button onclick="exportPNG()" title="Eksporter tegningen som PNG">🖼️ PNG</button>
   <button onclick="fileInput.click()">📂</button>
 
-  <button id="paintBtn" onclick="togglePaint()" title="Mal felter. Hold Shift nede og klik/træk for at slette grid-farver.">🎨</button>
+  <button id="paintBtn" onclick="togglePaint()" title="Mal felter. Hold Shift nede for at slette. Hold Ctrl nede og træk for at male et rektangel.">🎨</button>
   <!-- ✅ NEW -->
   <button id="wallBtn" onclick="toggleWall()">🧱</button>
 
@@ -251,7 +265,80 @@ let currentItem = null;
 let dragging = false;
 let resizing = false;
 
+let undoStack = [];
+let isRestoringState = false;
+let activePaintKeys = new Set();
+let paintingRect = false;
+let paintRectStart = null;
+let paintRectPreview = null;
+let paintRectErase = false;
+
 const snap = v => Math.floor(v / GRID_SIZE) * GRID_SIZE;
+
+function clonePlain(value){
+  return JSON.parse(JSON.stringify(value));
+}
+
+function createSnapshot(){
+  return {
+    items: clonePlain(items),
+    walls: clonePlain(walls),
+    paintedCells: clonePlain(paintedCells),
+    selectedId,
+    selectedWallIds: Array.from(selectedWallIds),
+    nextId,
+    nextWallId,
+    canvasWidthM,
+    canvasHeightM
+  };
+}
+
+function restoreSnapshot(snapshot){
+  isRestoringState = true;
+
+  items = clonePlain(snapshot.items || []);
+  walls = clonePlain(snapshot.walls || []);
+  paintedCells = clonePlain(snapshot.paintedCells || {});
+  selectedId = snapshot.selectedId ?? null;
+  selectedWallIds = new Set(snapshot.selectedWallIds || []);
+  nextId = snapshot.nextId || 1;
+  nextWallId = snapshot.nextWallId || 1;
+  canvasWidthM = snapshot.canvasWidthM || canvasWidthM;
+  canvasHeightM = snapshot.canvasHeightM || canvasHeightM;
+
+  drawingWall = false;
+  wallStart = null;
+  wallPreview = null;
+  currentItem = null;
+  dragging = false;
+  resizing = false;
+  rotating = false;
+  isPainting = false;
+  paintingRect = false;
+  paintRectStart = null;
+  paintRectPreview = null;
+  paintRectErase = false;
+  activePaintKeys.clear();
+
+  updateCanvasSize();
+  render();
+  isRestoringState = false;
+}
+
+function pushUndo(){
+  if (isRestoringState) return;
+  undoStack.push(createSnapshot());
+
+  // Hold historikken begrænset, så siden ikke bruger for meget hukommelse.
+  if (undoStack.length > 100) undoStack.shift();
+}
+
+function undoLastAction(){
+  const snapshot = undoStack.pop();
+  if (!snapshot) return;
+  restoreSnapshot(snapshot);
+}
+
 
 function showNew(){
   document.getElementById("newSetup").style.display="flex";
@@ -296,6 +383,7 @@ function initCanvas(){
 }
 
 function addBox(){
+  pushUndo();
   const item = {
     id: nextId++,
     x: 0, y: 0, w: 80, h: 80,
@@ -320,11 +408,14 @@ function updateShapeColorPicker(){
 function setSelectedShapeColor(color){
   const item = getSelectedItem();
   if (!item) return;
+  pushUndo();
   item.color = color;
   render();
 }
 
 function removeSelected(){
+  if (selectedId === null && !selectedWallIds.size) return;
+  pushUndo();
   items = items.filter(i => i.id !== selectedId);
 
   if (selectedWallIds.size) {
@@ -337,14 +428,15 @@ function removeSelected(){
 }
 
 function paintAtEvent(e){
-  const r = canvas.getBoundingClientRect();
-  const gx = Math.floor((e.clientX - r.left) / GRID_SIZE);
-  const gy = Math.floor((e.clientY - r.top) / GRID_SIZE);
+  const { gx, gy } = getGridCellFromEvent(e);
 
   const x = gx * GRID_SIZE;
   const y = gy * GRID_SIZE;
 
   const key = x + "," + y;
+
+  if (activePaintKeys.has(key)) return;
+  activePaintKeys.add(key);
 
   if (e.shiftKey) {
     delete paintedCells[key];
@@ -353,6 +445,48 @@ function paintAtEvent(e){
   }
 
   render();
+}
+
+function getGridCellFromEvent(e){
+  const r = canvas.getBoundingClientRect();
+  const gx = Math.max(0, Math.min(canvasWidthM - 1, Math.floor((e.clientX - r.left) / GRID_SIZE)));
+  const gy = Math.max(0, Math.min(canvasHeightM - 1, Math.floor((e.clientY - r.top) / GRID_SIZE)));
+  return { gx, gy };
+}
+
+function normalizePaintRect(a, b){
+  const x1 = Math.min(a.gx, b.gx);
+  const y1 = Math.min(a.gy, b.gy);
+  const x2 = Math.max(a.gx, b.gx);
+  const y2 = Math.max(a.gy, b.gy);
+  return { x1, y1, x2, y2 };
+}
+
+function applyPaintRect(rect, erase){
+  if (!rect) return;
+
+  for (let gy = rect.y1; gy <= rect.y2; gy++) {
+    for (let gx = rect.x1; gx <= rect.x2; gx++) {
+      const key = (gx * GRID_SIZE) + "," + (gy * GRID_SIZE);
+      if (erase) {
+        delete paintedCells[key];
+      } else {
+        paintedCells[key] = paintColor;
+      }
+    }
+  }
+}
+
+function drawPaintRectPreview(rect, erase){
+  if (!rect) return;
+
+  const d = document.createElement("div");
+  d.className = "paint-rect-preview" + (erase ? " erase" : "");
+  d.style.left = (rect.x1 * GRID_SIZE) + "px";
+  d.style.top = (rect.y1 * GRID_SIZE) + "px";
+  d.style.width = ((rect.x2 - rect.x1 + 1) * GRID_SIZE) + "px";
+  d.style.height = ((rect.y2 - rect.y1 + 1) * GRID_SIZE) + "px";
+  canvas.appendChild(d);
 }
 
 /* ✅ BETTER POINTER-BASED DRAWING */
@@ -407,6 +541,7 @@ function finishWallDrawing(){
 
     // Undgå at gemme en usynlig væg ved klik uden træk.
     if (length >= GRID_SIZE) {
+      pushUndo();
       walls.push({ id: nextWallId++, ...wallPreview });
     }
   }
@@ -441,9 +576,23 @@ canvas.addEventListener("pointerdown", (e) => {
   }
 
   if (paintMode) {
+    pushUndo();
+    activePaintKeys.clear();
     canvas.setPointerCapture(e.pointerId);
-    isPainting = true;
-    paintAtEvent(e);
+
+    if (e.ctrlKey || e.metaKey) {
+      e.preventDefault();
+      paintingRect = true;
+      isPainting = false;
+      paintRectErase = e.shiftKey;
+      paintRectStart = getGridCellFromEvent(e);
+      paintRectPreview = normalizePaintRect(paintRectStart, paintRectStart);
+      render();
+    } else {
+      isPainting = true;
+      paintAtEvent(e);
+    }
+
     return;
   }
 
@@ -453,6 +602,12 @@ canvas.addEventListener("pointerdown", (e) => {
 });
 
 canvas.addEventListener("pointermove", (e) => {
+  if (paintMode && paintingRect && paintRectStart) {
+    paintRectPreview = normalizePaintRect(paintRectStart, getGridCellFromEvent(e));
+    render();
+    return;
+  }
+
   if (paintMode && isPainting) {
     paintAtEvent(e);
     return;
@@ -470,6 +625,15 @@ canvas.addEventListener("pointerup", (e) => {
     canvas.releasePointerCapture(e.pointerId);
   }
 
+  if (paintingRect) {
+    applyPaintRect(paintRectPreview, paintRectErase);
+    paintingRect = false;
+    paintRectStart = null;
+    paintRectPreview = null;
+    paintRectErase = false;
+    render();
+  }
+
   if (drawingWall) finishWallDrawing();
 
   dragging=false;
@@ -477,6 +641,7 @@ canvas.addEventListener("pointerup", (e) => {
   rotating=false;
   currentItem=null;
   isPainting=false;
+  activePaintKeys.clear();
 });
 
 canvas.addEventListener("pointercancel", (e) => {
@@ -492,11 +657,25 @@ canvas.addEventListener("pointercancel", (e) => {
   rotating=false;
   currentItem=null;
   isPainting=false;
+  paintingRect=false;
+  paintRectStart=null;
+  paintRectPreview=null;
+  paintRectErase=false;
+  activePaintKeys.clear();
   render();
 });
 
 // Fallback hvis brugeren slipper musen uden for browser-vinduet.
 document.addEventListener("mouseup", () => {
+  if (paintingRect) {
+    applyPaintRect(paintRectPreview, paintRectErase);
+    paintingRect = false;
+    paintRectStart = null;
+    paintRectPreview = null;
+    paintRectErase = false;
+    render();
+  }
+
   if (drawingWall) finishWallDrawing();
 
   dragging=false;
@@ -504,14 +683,24 @@ document.addEventListener("mouseup", () => {
   rotating=false;
   currentItem=null;
   isPainting=false;
+  activePaintKeys.clear();
 });
 
 document.addEventListener("keydown", e => {
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") {
+    if (!e.target.matches("input, textarea")) {
+      e.preventDefault();
+      undoLastAction();
+    }
+    return;
+  }
+
   if (e.target.matches("input, textarea")) return;
 
   if (e.key === "Delete" || e.key === "Backspace") {
     if (selectedWallIds.size) {
       e.preventDefault();
+      pushUndo();
       walls = walls.filter(w => !selectedWallIds.has(w.id));
       selectedWallIds.clear();
       render();
@@ -571,6 +760,37 @@ function formatMeters(px){
 
 function getItemSizeText(item){
   return `${formatMeters(item.w)} m × ${formatMeters(item.h)} m`;
+}
+
+
+async function exportPNG(){
+  // Gem valgt tilstand, så eksporten bliver ren uden markeringer/håndtag.
+  const savedSelectedId = selectedId;
+  const savedSelectedWallIds = new Set(selectedWallIds);
+
+  selectedId = null;
+  selectedWallIds.clear();
+  render();
+
+  // Vent et øjeblik, så DOM'en når at opdatere før html2canvas tager snapshot.
+  await new Promise(resolve => requestAnimationFrame(resolve));
+
+  const imageCanvas = await html2canvas(canvas, {
+    backgroundColor: "#ffffff",
+    scale: 2,
+    useCORS: true
+  });
+
+  const link = document.createElement("a");
+  const now = new Date();
+  const stamp = now.toISOString().slice(0,19).replace(/[:T]/g,"-");
+  link.download = `expo-planner-${stamp}.png`;
+  link.href = imageCanvas.toDataURL("image/png");
+  link.click();
+
+  selectedId = savedSelectedId;
+  selectedWallIds = savedSelectedWallIds;
+  render();
 }
 
 function drawWall(w, preview){
@@ -635,6 +855,10 @@ function render(){
     canvas.appendChild(cell);
   });
 
+  if (paintRectPreview) {
+    drawPaintRectPreview(paintRectPreview, paintRectErase);
+  }
+
   /* ✅ walls */
   walls.forEach(w => { if (!w.id) w.id = nextWallId++; });
   walls.forEach(w => drawWall(w,false));
@@ -662,6 +886,14 @@ function render(){
     nameInput.placeholder = "Navn på figur";
     nameInput.addEventListener("mousedown", e => e.stopPropagation());
     nameInput.addEventListener("click", e => e.stopPropagation());
+    nameInput.addEventListener("focus", () => {
+      if (nameInput.dataset.undoStarted === "1") return;
+      nameInput.dataset.undoStarted = "1";
+      pushUndo();
+    });
+    nameInput.addEventListener("blur", () => {
+      nameInput.dataset.undoStarted = "0";
+    });
     nameInput.addEventListener("input", e => {
       item.name = e.target.value;
     });
@@ -674,6 +906,7 @@ function render(){
 
     el.addEventListener("mousedown",(e)=>{
       if(e.target.closest("input") || e.target.classList.contains("rotator")) return;
+      pushUndo();
       dragging=true;
       currentItem=item;
       selectedId=item.id;
@@ -685,6 +918,7 @@ function render(){
     r.className="resizer";
     r.addEventListener("mousedown",(e)=>{
       e.stopPropagation();
+      pushUndo();
       resizing=true;
       currentItem=item;
       selectedId=item.id;
@@ -698,7 +932,10 @@ function render(){
       colorInput.className = "shape-color-inline";
       colorInput.title = "Skift figurens farve";
       colorInput.value = item.color || "#3b82f6";
-      colorInput.addEventListener("mousedown", e => e.stopPropagation());
+      colorInput.addEventListener("mousedown", e => {
+        e.stopPropagation();
+        pushUndo();
+      });
       colorInput.addEventListener("click", e => e.stopPropagation());
       colorInput.addEventListener("input", e => {
         item.color = e.target.value;
@@ -717,6 +954,7 @@ function render(){
         e.stopPropagation();
         e.preventDefault();
 
+        pushUndo();
         rotating=true;
         currentItem=item;
 
