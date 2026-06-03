@@ -206,10 +206,10 @@ input.name-input {
 
 <div id="setup">
   <div id="setupBox">
-    <h3>Messe Planner</h3>
+    <h3>Expo Planner</h3>
 
-    <button onclick="showNew()">🆕 Opret nyt</button>
-    <button onclick="fileInput.click()">📂 Indlæs layout</button>
+    <button onclick="showNew()">🆕 Create New</button>
+    <button onclick="fileInput.click()">📂 Load Layout</button>
 
     <div id="newSetup" style="display:none">
       <label>Width (m)<input id="widthInput" type="number" value="47"></label>
@@ -221,8 +221,7 @@ input.name-input {
 
 <div class="toolbar">
   <button onclick="addBox()" title="Tilføj figur">➕</button>
-  <button onclick="duplicateSelectedItem()" title="Kopiér markeret figur">⧉ Kopi</button>
-  <button onclick="saveLayout()">💾</button>
+    <button onclick="saveLayout()">💾</button>
   <button onclick="exportPNG()" title="Eksporter tegningen som PNG">🖼️ PNG</button>
   <button onclick="fileInput.click()">📂</button>
 
