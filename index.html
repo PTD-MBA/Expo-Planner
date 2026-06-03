@@ -2,7 +2,7 @@
 <html lang="da">
 <head>
 <meta charset="UTF-8">
-<title>Expo Planner - V.1.3</title>
+<title>Expo Planner - V.1.4</title>
 
 <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 
@@ -146,6 +146,21 @@ input.name-input {
   font-size: 12px;
 }
 
+.export-name-text {
+  width: 100%;
+  min-height: 20px;
+  text-align: center;
+  background: rgba(255,255,255,0.9);
+  border-radius: 5px;
+  padding: 3px 4px;
+  box-sizing: border-box;
+  font-size: 12px;
+  color: #111827;
+  overflow: visible;
+  white-space: normal;
+  word-break: break-word;
+}
+
 .box-size {
   margin-top: 5px;
   padding: 2px 5px;
@@ -205,8 +220,9 @@ input.name-input {
 </div>
 
 <div class="toolbar">
-  <button onclick="addBox()">➕</button>
-    <button onclick="saveLayout()">💾</button>
+  <button onclick="addBox()" title="Tilføj figur">➕</button>
+  <button onclick="duplicateSelectedItem()" title="Kopiér markeret figur">⧉ Kopi</button>
+  <button onclick="saveLayout()">💾</button>
   <button onclick="exportPNG()" title="Eksporter tegningen som PNG">🖼️ PNG</button>
   <button onclick="fileInput.click()">📂</button>
 
@@ -260,6 +276,7 @@ let canvasHeightM = 17;
 let items = [];
 let selectedId = null;
 let nextId = 1;
+let copiedItem = null;
 
 let currentItem = null;
 let dragging = false;
@@ -400,6 +417,48 @@ function addBox(){
 function getSelectedItem(){
   return items.find(i => i.id === selectedId) || null;
 }
+
+function copySelectedItem(){
+  const item = getSelectedItem();
+  if (!item) return false;
+
+  copiedItem = clonePlain(item);
+  return true;
+}
+
+function pasteCopiedItem(){
+  if (!copiedItem) return;
+
+  pushUndo();
+
+  const item = clonePlain(copiedItem);
+  item.id = nextId++;
+
+  // Læg kopien én grid-celle forskudt, så man tydeligt kan se den.
+  item.x = (item.x || 0) + GRID_SIZE;
+  item.y = (item.y || 0) + GRID_SIZE;
+
+  clampItemSizeToCanvas(item);
+  clampItemToCanvas(item);
+
+  // Hvis kopien rammer kanten og ender præcis oven på originalen, prøv modsat retning.
+  if (copiedItem.x === item.x && copiedItem.y === item.y) {
+    item.x = Math.max(0, (copiedItem.x || 0) - GRID_SIZE);
+    item.y = Math.max(0, (copiedItem.y || 0) - GRID_SIZE);
+    clampItemToCanvas(item);
+  }
+
+  items.push(item);
+  selectedId = item.id;
+  selectedWallIds.clear();
+  render();
+}
+
+function duplicateSelectedItem(){
+  if (!copySelectedItem()) return;
+  pasteCopiedItem();
+}
+
 
 function updateShapeColorPicker(){
   // Farvevælgeren ligger nu direkte på den markerede figur.
@@ -687,15 +746,33 @@ document.addEventListener("mouseup", () => {
 });
 
 document.addEventListener("keydown", e => {
+  const isTextField = e.target.matches("input, textarea");
+
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") {
-    if (!e.target.matches("input, textarea")) {
+    if (!isTextField) {
       e.preventDefault();
       undoLastAction();
     }
     return;
   }
 
-  if (e.target.matches("input, textarea")) return;
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "c") {
+    if (!isTextField && selectedId !== null) {
+      e.preventDefault();
+      copySelectedItem();
+    }
+    return;
+  }
+
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "v") {
+    if (!isTextField && copiedItem) {
+      e.preventDefault();
+      pasteCopiedItem();
+    }
+    return;
+  }
+
+  if (isTextField) return;
 
   if (e.key === "Delete" || e.key === "Backspace") {
     if (selectedWallIds.size) {
@@ -772,25 +849,41 @@ async function exportPNG(){
   selectedWallIds.clear();
   render();
 
-  // Vent et øjeblik, så DOM'en når at opdatere før html2canvas tager snapshot.
-  await new Promise(resolve => requestAnimationFrame(resolve));
+  try {
+    // Vent et øjeblik, så DOM'en når at opdatere før html2canvas tager snapshot.
+    await new Promise(resolve => requestAnimationFrame(resolve));
 
-  const imageCanvas = await html2canvas(canvas, {
-    backgroundColor: "#ffffff",
-    scale: 2,
-    useCORS: true
-  });
+    if (document.fonts && document.fonts.ready) {
+      await document.fonts.ready;
+    }
 
-  const link = document.createElement("a");
-  const now = new Date();
-  const stamp = now.toISOString().slice(0,19).replace(/[:T]/g,"-");
-  link.download = `expo-planner-${stamp}.png`;
-  link.href = imageCanvas.toDataURL("image/png");
-  link.click();
+    const imageCanvas = await html2canvas(canvas, {
+      backgroundColor: "#ffffff",
+      scale: 2,
+      useCORS: true,
+      onclone: (clonedDocument) => {
+        // html2canvas kan beskære tekst inde i input-felter.
+        // Derfor erstatter vi kun i eksport-kopien inputfelterne med almindelige divs.
+        clonedDocument.querySelectorAll(".name-input").forEach(input => {
+          const text = clonedDocument.createElement("div");
+          text.className = "export-name-text";
+          text.textContent = input.value || input.getAttribute("value") || "";
+          input.replaceWith(text);
+        });
+      }
+    });
 
-  selectedId = savedSelectedId;
-  selectedWallIds = savedSelectedWallIds;
-  render();
+    const link = document.createElement("a");
+    const now = new Date();
+    const stamp = now.toISOString().slice(0,19).replace(/[:T]/g,"-");
+    link.download = `expo-planner-${stamp}.png`;
+    link.href = imageCanvas.toDataURL("image/png");
+    link.click();
+  } finally {
+    selectedId = savedSelectedId;
+    selectedWallIds = savedSelectedWallIds;
+    render();
+  }
 }
 
 function drawWall(w, preview){
@@ -800,7 +893,7 @@ function drawWall(w, preview){
   if(preview) d.style.opacity="0.5";
 
   if (!preview) {
-    d.title = "Klik for at vælge væg. Tryk Delete eller 🗑 for at slette den valgte væg.";
+    d.title = "Klik for at vælge væg. Tryk Delete for at slette den valgte væg.";
     d.addEventListener("pointerdown", (e) => {
       e.preventDefault();
       e.stopPropagation();
