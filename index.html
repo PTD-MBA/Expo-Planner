@@ -4,7 +4,6 @@
 <meta charset="UTF-8">
 <title>Messe Stand Planner</title>
 
-<!-- ✅ KORREKT script -->
 <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 
 <style>
@@ -14,7 +13,6 @@ body {
   background: #f1f5f9;
 }
 
-/* ✅ toolbar (starter skjult) */
 .toolbar {
   display: none;
   position: fixed;
@@ -24,13 +22,11 @@ body {
   gap: 10px;
   padding: 10px 15px;
   border-radius: 12px;
-
   background: rgba(255,255,255,0.85);
   backdrop-filter: blur(10px);
   box-shadow: 0 8px 20px rgba(0,0,0,0.1);
 }
 
-/* buttons */
 button {
   border: none;
   padding: 8px 12px;
@@ -39,23 +35,49 @@ button {
   color: white;
   cursor: pointer;
 }
-button:hover { transform: translateY(-1px); }
 
-/* canvas */
+.paint-active {
+  outline: 2px solid #22c55e;
+}
+
+.wall-active {
+  outline: 2px solid #111;
+}
+
 #canvas {
   position: relative;
   margin: 100px auto;
   border-radius: 16px;
   background: white;
   box-shadow: 0 20px 40px rgba(0,0,0,0.08);
-
   background-size: 40px 40px;
   background-image:
     linear-gradient(to right,#e5e7eb 1px,transparent 1px),
     linear-gradient(to bottom,#e5e7eb 1px,transparent 1px);
 }
 
-/* box */
+.canvas-paint { cursor: crosshair; }
+
+.canvas-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(34,197,94,0.08);
+  pointer-events: none;
+}
+
+/* ✅ NEW */
+.wall {
+  position:absolute;
+  background:black;
+  pointer-events:auto;
+  cursor: pointer;
+}
+
+.wall.selected-wall {
+  background: #ef4444;
+  outline: 3px solid #fca5a5;
+}
+
 .box {
   position: absolute;
   border-radius: 10px;
@@ -64,12 +86,12 @@ button:hover { transform: translateY(-1px); }
   flex-direction: column;
   align-items: center;
   justify-content: center;
-
   padding: 6px;
+  box-sizing: border-box;
   cursor: move;
   font-size: 12px;
-
   box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+  transform-origin: center;
 }
 
 .selected { outline: 3px solid red; }
@@ -86,14 +108,41 @@ button:hover { transform: translateY(-1px); }
   cursor: se-resize;
 }
 
+.rotator {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: yellow;
+  border: 2px solid black;
+  top: -20px;
+  left: 50%;
+  transform: translateX(-50%);
+  cursor: grab;
+}
+
 input.name-input {
   width: 100%;
   border: none;
   text-align: center;
-  background: rgba(255,255,255,0.85);
+  background: rgba(255,255,255,0.9);
+  border-radius: 5px;
+  padding: 3px 4px;
+  box-sizing: border-box;
+  font-size: 12px;
 }
 
-/* start screen */
+.box-size {
+  margin-top: 5px;
+  padding: 2px 5px;
+  border-radius: 5px;
+  background: rgba(0,0,0,0.25);
+  color: white;
+  font-weight: 600;
+  font-size: 11px;
+  line-height: 1.2;
+}
+
 #setup {
   position: fixed;
   inset: 0;
@@ -110,12 +159,22 @@ input.name-input {
   width: 260px;
   text-align: center;
 }
+
+#newSetup {
+  flex-direction: column;
+  gap: 10px;
+}
+
+#newSetup label {
+  display: flex;
+  flex-direction: column;
+  font-size: 13px;
+}
 </style>
 </head>
 
 <body>
 
-<!-- ✅ START SKÆRM -->
 <div id="setup">
   <div id="setupBox">
     <h3>Messe Planner</h3>
@@ -124,8 +183,8 @@ input.name-input {
     <button onclick="fileInput.click()">📂 Indlæs layout</button>
 
     <div id="newSetup" style="display:none">
-      Width (m): <input id="widthInput" type="number" value="0">
-      Height (m): <input id="heightInput" type="number" value="0">
+      <label>Width (m)<input id="widthInput" type="number" value="47"></label>
+      <label>Height (m)<input id="heightInput" type="number" value="17"></label>
       <button onclick="initCanvas()">Start</button>
     </div>
   </div>
@@ -136,247 +195,503 @@ input.name-input {
   <button onclick="removeSelected()">🗑</button>
   <button onclick="saveLayout()">💾</button>
   <button onclick="fileInput.click()">📂</button>
-  <button onclick="exportImage()">🖼</button>
+
+  <button id="paintBtn" onclick="togglePaint()">🎨</button>
+  <!-- ✅ NEW -->
+  <button id="wallBtn" onclick="toggleWall()">🧱</button>
+
+  <input type="color" onchange="paintColor=this.value">
   <input type="file" id="fileInput" hidden>
 </div>
 
 <div id="canvas"></div>
 
 <script>
-const GRID_SIZE=40;
-const PX_TO_METER=1/40;
+const GRID_SIZE = 40;
+const PX_TO_METER = 1/40;
 
-const canvas=document.getElementById("canvas");
-const fileInput=document.getElementById("fileInput");
-const setup=document.getElementById("setup");
-const toolbar=document.querySelector(".toolbar");
+const canvas = document.getElementById("canvas");
+const fileInput = document.getElementById("fileInput");
+const setup = document.getElementById("setup");
+const toolbar = document.querySelector(".toolbar");
 
-let canvasWidthM=47;
-let canvasHeightM=17;
+let paintMode = false;
+let paintColor = "#22c55e";
+let paintedCells = {};
+let isPainting = false;
 
-let items=[];
-let selectedId=null;
-let nextId=1;
+/* ✅ NEW WALL STATE */
+let walls = [];
+let selectedWallIds = new Set();
+let nextWallId = 1;
+let wallMode = false;
+let drawingWall = false;
+let wallStart = null;
+let wallPreview = null;
 
-let currentItem=null;
-let dragging=false;
-let resizing=false;
+let rotating = false;
+let rotationStartMouseAngle = 0;
+let rotationStartItemAngle = 0;
 
-const snap=v=>Math.round(v/GRID_SIZE)*GRID_SIZE;
+let canvasWidthM = 47;
+let canvasHeightM = 17;
 
-// UI
+let items = [];
+let selectedId = null;
+let nextId = 1;
+
+let currentItem = null;
+let dragging = false;
+let resizing = false;
+
+const snap = v => Math.floor(v / GRID_SIZE) * GRID_SIZE;
+
 function showNew(){
-  newSetup.style.display="block";
+  document.getElementById("newSetup").style.display="flex";
 }
 
-// canvas
-function updateCanvasSize(){
-  canvas.style.width=canvasWidthM*GRID_SIZE+"px";
-  canvas.style.height=canvasHeightM*GRID_SIZE+"px";
-}
+function togglePaint(){
+  paintMode = !paintMode;
+  wallMode = false;
 
-function initCanvas(){
-  canvasWidthM=widthInput.value;
-  canvasHeightM=heightInput.value;
+  paintBtn.classList.toggle("paint-active",paintMode);
+  wallBtn.classList.remove("wall-active");
 
-  updateCanvasSize();
-
-  setup.style.display="none";
-  toolbar.style.display="flex"; // ✅ vis toolbar
+  canvas.classList.toggle("canvas-paint",paintMode);
 
   render();
 }
 
-// add/remove
+/* ✅ NEW */
+function toggleWall(){
+  wallMode = !wallMode;
+  paintMode = false;
+
+  wallBtn.classList.toggle("wall-active", wallMode);
+  paintBtn.classList.remove("paint-active");
+
+  canvas.classList.remove("canvas-paint");
+}
+
+function updateCanvasSize(){
+  canvas.style.width = canvasWidthM * GRID_SIZE + "px";
+  canvas.style.height = canvasHeightM * GRID_SIZE + "px";
+}
+
+function initCanvas(){
+  canvasWidthM = parseInt(widthInput.value)||10;
+  canvasHeightM = parseInt(heightInput.value)||10;
+
+  updateCanvasSize();
+  setup.style.display="none";
+  toolbar.style.display="flex";
+  render();
+}
+
 function addBox(){
   items.push({
-    id:nextId++,
-    x:0,y:0,w:80,h:80,
-    name:"Ny stand",
-    color:"#3b82f6"
+    id: nextId++,
+    x: 0, y: 0, w: 80, h: 80,
+    angle: 0,
+    name: "Ny stand",
+    color: "#3b82f6"
   });
   render();
 }
 
 function removeSelected(){
-  items=items.filter(i=>i.id!==selectedId);
-  selectedId=null;
+  items = items.filter(i => i.id !== selectedId);
+
+  if (selectedWallIds.size) {
+    walls = walls.filter(w => !selectedWallIds.has(w.id));
+    selectedWallIds.clear();
+  }
+
+  selectedId = null;
   render();
 }
 
-// save/load
-function saveLayout(){
-  const data=JSON.stringify({
-    items,
-    widthM:canvasWidthM,
-    heightM:canvasHeightM
-  });
+function paintAtEvent(e){
+  const r = canvas.getBoundingClientRect();
+  const gx = Math.floor((e.clientX - r.left) / GRID_SIZE);
+  const gy = Math.floor((e.clientY - r.top) / GRID_SIZE);
 
-  const blob=new Blob([data]);
-  const a=document.createElement("a");
-  a.href=URL.createObjectURL(blob);
-  a.download="layout.json";
-  a.click();
+  const x = gx * GRID_SIZE;
+  const y = gy * GRID_SIZE;
+
+  const key = x + "," + y;
+
+  if (e.shiftKey) {
+    delete paintedCells[key];
+  } else {
+    paintedCells[key] = paintColor;
+  }
+
+  render();
 }
 
-fileInput.addEventListener("change", e=>{
-  const file=e.target.files[0];
-  if(!file) return;
-
-  const reader=new FileReader();
-  reader.onload=evt=>{
-    const data=JSON.parse(evt.target.result);
-
-    items=data.items||[];
-    canvasWidthM=data.widthM||20;
-    canvasHeightM=data.heightM||20;
-
-    updateCanvasSize();
-
-    nextId=Math.max(...items.map(i=>i.id),0)+1;
-
-    setup.style.display="none";
-    toolbar.style.display="flex"; // ✅ vis toolbar
-
-    render();
+/* ✅ BETTER POINTER-BASED DRAWING */
+function getCanvasPoint(e){
+  const r = canvas.getBoundingClientRect();
+  return {
+    x: snap(e.clientX - r.left),
+    y: snap(e.clientY - r.top)
   };
-  reader.readAsText(file);
+}
+
+function clampPointToCanvas(p){
+  return {
+    x: Math.max(0, Math.min(p.x, canvas.offsetWidth)),
+    y: Math.max(0, Math.min(p.y, canvas.offsetHeight))
+  };
+}
+
+function clampItemToCanvas(item){
+  const maxX = Math.max(0, canvas.offsetWidth - item.w);
+  const maxY = Math.max(0, canvas.offsetHeight - item.h);
+
+  item.x = Math.max(0, Math.min(item.x, maxX));
+  item.y = Math.max(0, Math.min(item.y, maxY));
+}
+
+function clampItemSizeToCanvas(item){
+  const maxW = Math.max(GRID_SIZE, canvas.offsetWidth - item.x);
+  const maxH = Math.max(GRID_SIZE, canvas.offsetHeight - item.y);
+
+  item.w = Math.max(GRID_SIZE, Math.min(item.w, maxW));
+  item.h = Math.max(GRID_SIZE, Math.min(item.h, maxH));
+}
+
+function normalizeWall(start, end){
+  let nx = end.x;
+  let ny = end.y;
+
+  // Hold vægge enten vandrette eller lodrette.
+  if (Math.abs(nx - start.x) >= Math.abs(ny - start.y)) {
+    ny = start.y;
+  } else {
+    nx = start.x;
+  }
+
+  return { x1:start.x, y1:start.y, x2:nx, y2:ny };
+}
+
+function finishWallDrawing(){
+  if (drawingWall && wallPreview) {
+    const length = Math.abs(wallPreview.x2 - wallPreview.x1) + Math.abs(wallPreview.y2 - wallPreview.y1);
+
+    // Undgå at gemme en usynlig væg ved klik uden træk.
+    if (length >= GRID_SIZE) {
+      walls.push({ id: nextWallId++, ...wallPreview });
+    }
+  }
+
+  drawingWall = false;
+  wallPreview = null;
+  wallStart = null;
+  render();
+}
+
+function startWallDrawing(e){
+  const p = clampPointToCanvas(getCanvasPoint(e));
+  e.preventDefault();
+  canvas.setPointerCapture(e.pointerId);
+  drawingWall = true;
+  wallStart = p;
+  wallPreview = { x1:p.x, y1:p.y, x2:p.x, y2:p.y };
+  selectedWallIds.clear();
+  render();
+}
+
+canvas.addEventListener("pointerdown", (e) => {
+  if (e.button !== 0) return;
+  if (e.target !== canvas) return;
+
+  const p = clampPointToCanvas(getCanvasPoint(e));
+
+  if (!paintMode && !wallMode) {
+    selectedWallIds.clear();
+    selectedId = null;
+    render();
+  }
+
+  if (paintMode) {
+    canvas.setPointerCapture(e.pointerId);
+    isPainting = true;
+    paintAtEvent(e);
+    return;
+  }
+
+  if (wallMode) {
+    startWallDrawing(e);
+  }
 });
 
-// export
-function exportImage(){
-  const old=selectedId;
-  selectedId=null;
-  render();
+canvas.addEventListener("pointermove", (e) => {
+  if (paintMode && isPainting) {
+    paintAtEvent(e);
+    return;
+  }
 
-  html2canvas(canvas,{
-    scale:2,
-    onclone:(doc)=>{
-      doc.querySelectorAll("input").forEach(i=>{
-        const d=doc.createElement("div");
-        d.innerText=i.value;
-        d.style.textAlign="center";
-        i.replaceWith(d);
-      });
-    }
-  }).then(c=>{
-    const a=document.createElement("a");
-    a.href=c.toDataURL();
-    a.download="image.png";
-    a.click();
-
-    selectedId=old;
+  if (wallMode && drawingWall && wallStart) {
+    const p = clampPointToCanvas(getCanvasPoint(e));
+    wallPreview = normalizeWall(wallStart, p);
     render();
-  });
-}
+  }
+});
 
-// mouse
-document.addEventListener("mousemove",e=>{
+canvas.addEventListener("pointerup", (e) => {
+  if (canvas.hasPointerCapture(e.pointerId)) {
+    canvas.releasePointerCapture(e.pointerId);
+  }
+
+  if (drawingWall) finishWallDrawing();
+
+  dragging=false;
+  resizing=false;
+  rotating=false;
+  currentItem=null;
+  isPainting=false;
+});
+
+canvas.addEventListener("pointercancel", (e) => {
+  if (canvas.hasPointerCapture(e.pointerId)) {
+    canvas.releasePointerCapture(e.pointerId);
+  }
+
+  drawingWall=false;
+  wallPreview=null;
+  wallStart=null;
+  dragging=false;
+  resizing=false;
+  rotating=false;
+  currentItem=null;
+  isPainting=false;
+  render();
+});
+
+// Fallback hvis brugeren slipper musen uden for browser-vinduet.
+document.addEventListener("mouseup", () => {
+  if (drawingWall) finishWallDrawing();
+
+  dragging=false;
+  resizing=false;
+  rotating=false;
+  currentItem=null;
+  isPainting=false;
+});
+
+document.addEventListener("keydown", e => {
+  if (e.target.matches("input, textarea")) return;
+
+  if (e.key === "Delete" || e.key === "Backspace") {
+    if (selectedWallIds.size) {
+      e.preventDefault();
+      walls = walls.filter(w => !selectedWallIds.has(w.id));
+      selectedWallIds.clear();
+      render();
+      return;
+    }
+
+    if (selectedId !== null) {
+      e.preventDefault();
+      removeSelected();
+    }
+  }
+});
+
+document.addEventListener("mousemove", e=>{
   if(!currentItem) return;
-
-  const r=canvas.getBoundingClientRect();
-  const x=e.clientX-r.left;
-  const y=e.clientY-r.top;
+  const r = canvas.getBoundingClientRect();
+  const x = e.clientX - r.left;
+  const y = e.clientY - r.top;
 
   if(dragging){
-    let nx=snap(x-currentItem.w/2);
-    let ny=snap(y-currentItem.h/2);
-
-    nx=Math.min(Math.max(0,nx), canvasWidthM*GRID_SIZE-currentItem.w);
-    ny=Math.min(Math.max(0,ny), canvasHeightM*GRID_SIZE-currentItem.h);
-
-    currentItem.x=nx;
-    currentItem.y=ny;
+    currentItem.x = snap(x - currentItem.w/2);
+    currentItem.y = snap(y - currentItem.h/2);
+    clampItemToCanvas(currentItem);
     render();
   }
 
   if(resizing){
-    let nw=snap(x-currentItem.x);
-    let nh=snap(y-currentItem.y);
+    currentItem.w = Math.max(GRID_SIZE, snap(x - currentItem.x));
+    currentItem.h = Math.max(GRID_SIZE, snap(y - currentItem.y));
+    clampItemSizeToCanvas(currentItem);
+    render();
+  }
 
-    const maxW=canvasWidthM*GRID_SIZE-currentItem.x;
-    const maxH=canvasHeightM*GRID_SIZE-currentItem.y;
+  if(rotating){
+    const cx = currentItem.x + currentItem.w/2;
+    const cy = currentItem.y + currentItem.h/2;
 
-    nw=snap(Math.min(nw,maxW));
-    nh=snap(Math.min(nh,maxH));
+    const mouseAngle = Math.atan2(y - cy, x - cx) * 180 / Math.PI;
+    const delta = mouseAngle - rotationStartMouseAngle;
 
-    currentItem.w=nw;
-    currentItem.h=nh;
+    let newAngle = rotationStartItemAngle + delta;
+
+    // Snap til 15 grader som standard. Hold Shift nede for fri rotation.
+    if(!e.shiftKey){
+      newAngle = Math.round(newAngle / 15) * 15;
+    }
+
+    currentItem.angle = newAngle;
     render();
   }
 });
 
-document.addEventListener("mouseup",()=>{
-  dragging=false;
-  resizing=false;
-  currentItem=null;
-});
+function formatMeters(px){
+  const meters = px * PX_TO_METER;
+  return Number.isInteger(meters) ? String(meters) : meters.toFixed(1);
+}
 
-// render
+function getItemSizeText(item){
+  return `${formatMeters(item.w)} m × ${formatMeters(item.h)} m`;
+}
+
+function drawWall(w, preview){
+  const d=document.createElement("div");
+  d.className="wall";
+  if(w.id && selectedWallIds.has(w.id)) d.classList.add("selected-wall");
+  if(preview) d.style.opacity="0.5";
+
+  if (!preview) {
+    d.title = "Klik for at vælge væg. Tryk Delete eller 🗑 for at slette den valgte væg.";
+    d.addEventListener("pointerdown", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+
+      // Vælg væg direkte — ingen Shift nødvendig.
+      selectedWallIds.clear();
+      selectedWallIds.add(w.id);
+      selectedId = null;
+      render();
+    });
+  }
+
+  if(w.x1===w.x2){
+    d.style.left=w.x1+"px";
+    d.style.top=Math.min(w.y1,w.y2)+"px";
+    d.style.width="4px";
+    d.style.height=Math.abs(w.y2-w.y1)+"px";
+  } else {
+    d.style.left=Math.min(w.x1,w.x2)+"px";
+    d.style.top=w.y1+"px";
+    d.style.width=Math.abs(w.x2-w.x1)+"px";
+    d.style.height="4px";
+  }
+
+  canvas.appendChild(d);
+}
+
 function render(){
   canvas.innerHTML="";
 
+  if (paintMode) {
+    const overlay = document.createElement("div");
+    overlay.className = "canvas-overlay";
+    canvas.appendChild(overlay);
+  }
+
+  Object.entries(paintedCells).forEach(([key, color]) => {
+    const [x, y] = key.split(",").map(Number);
+
+    const cell = document.createElement("div");
+    cell.style.position="absolute";
+    cell.style.left=x+"px";
+    cell.style.top=y+"px";
+    cell.style.width=GRID_SIZE+"px";
+    cell.style.height=GRID_SIZE+"px";
+    cell.style.background=color;
+    cell.style.opacity=0.4;
+
+    canvas.appendChild(cell);
+  });
+
+  /* ✅ walls */
+  walls.forEach(w => { if (!w.id) w.id = nextWallId++; });
+  walls.forEach(w => drawWall(w,false));
+  if(wallPreview) drawWall(wallPreview,true);
+
   items.forEach(item=>{
+    clampItemSizeToCanvas(item);
+    clampItemToCanvas(item);
+
     const el=document.createElement("div");
     el.className="box";
-    el.style.background=item.color;
-
-    if(item.id===selectedId) el.classList.add("selected");
-
     el.style.left=item.x+"px";
     el.style.top=item.y+"px";
     el.style.width=item.w+"px";
     el.style.height=item.h+"px";
+    el.style.background=item.color;
+    el.style.transform=`rotate(${item.angle}deg)`;
 
-    const name=document.createElement("input");
-    name.value=item.name;
-    name.className="name-input";
+    if(item.id===selectedId) el.classList.add("selected");
 
-    name.addEventListener("mousedown",e=>e.stopPropagation());
-    name.addEventListener("focus",()=>{
-      dragging=false;
-      resizing=false;
-      currentItem=null;
+    const nameInput = document.createElement("input");
+    nameInput.className = "name-input";
+    nameInput.type = "text";
+    nameInput.value = item.name || "";
+    nameInput.placeholder = "Navn på figur";
+    nameInput.addEventListener("mousedown", e => e.stopPropagation());
+    nameInput.addEventListener("click", e => e.stopPropagation());
+    nameInput.addEventListener("input", e => {
+      item.name = e.target.value;
     });
-    name.addEventListener("input",e=>item.name=e.target.value);
+    el.appendChild(nameInput);
 
-    const size=document.createElement("div");
-    size.innerText=
-      (item.w*PX_TO_METER).toFixed(1)+" × "+
-      (item.h*PX_TO_METER).toFixed(1)+" m";
+    const sizeLabel = document.createElement("div");
+    sizeLabel.className = "box-size";
+    sizeLabel.textContent = getItemSizeText(item);
+    el.appendChild(sizeLabel);
 
-    el.addEventListener("mousedown",e=>{
-      if(e.target.tagName==="INPUT") return;
-
+    el.addEventListener("mousedown",(e)=>{
+      if(e.target.closest("input") || e.target.classList.contains("rotator")) return;
       dragging=true;
       currentItem=item;
       selectedId=item.id;
+      selectedWallIds.clear();
       render();
     });
 
     const r=document.createElement("div");
     r.className="resizer";
-
-    r.addEventListener("mousedown",e=>{
+    r.addEventListener("mousedown",(e)=>{
       e.stopPropagation();
       resizing=true;
-      dragging=false;
       currentItem=item;
       selectedId=item.id;
     });
 
-    el.appendChild(name);
-    el.appendChild(size);
     el.appendChild(r);
+
+    if(item.id===selectedId){
+      const rot=document.createElement("div");
+      rot.className="rotator";
+
+      rot.addEventListener("mousedown",(e)=>{
+        e.stopPropagation();
+        e.preventDefault();
+
+        rotating=true;
+        currentItem=item;
+
+        const r = canvas.getBoundingClientRect();
+        const x = e.clientX - r.left;
+        const y = e.clientY - r.top;
+
+        const cx = item.x + item.w/2;
+        const cy = item.y + item.h/2;
+
+        rotationStartMouseAngle = Math.atan2(y - cy, x - cx) * 180 / Math.PI;
+        rotationStartItemAngle = item.angle || 0;
+      });
+
+      el.appendChild(rot);
+    }
 
     canvas.appendChild(el);
   });
 }
-
-canvas.addEventListener("click",()=>{
-  selectedId=null;
-  render();
-});
 </script>
 
 </body>
