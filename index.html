@@ -196,11 +196,16 @@ input.name-input {
   <button onclick="saveLayout()">💾</button>
   <button onclick="fileInput.click()">📂</button>
 
-  <button id="paintBtn" onclick="togglePaint()">🎨</button>
+  <button id="paintBtn" onclick="togglePaint()" title="Mal felter. Hold Shift nede og klik/træk for at slette grid-farver.">🎨</button>
   <!-- ✅ NEW -->
   <button id="wallBtn" onclick="toggleWall()">🧱</button>
 
-  <input type="color" onchange="paintColor=this.value">
+  <label title="Farve til mal-funktionen">
+    🎨 Grid
+    <input type="color" id="paintColorInput" value="#22c55e" onchange="paintColor=this.value">
+  </label>
+
+
   <input type="file" id="fileInput" hidden>
 </div>
 
@@ -214,6 +219,8 @@ const canvas = document.getElementById("canvas");
 const fileInput = document.getElementById("fileInput");
 const setup = document.getElementById("setup");
 const toolbar = document.querySelector(".toolbar");
+const shapeColorInput = document.getElementById("shapeColorInput");
+const paintColorInput = document.getElementById("paintColorInput");
 
 let paintMode = false;
 let paintColor = "#22c55e";
@@ -289,13 +296,31 @@ function initCanvas(){
 }
 
 function addBox(){
-  items.push({
+  const item = {
     id: nextId++,
     x: 0, y: 0, w: 80, h: 80,
     angle: 0,
     name: "Ny stand",
     color: "#3b82f6"
-  });
+  };
+  items.push(item);
+  selectedId = item.id;
+  selectedWallIds.clear();
+  render();
+}
+
+function getSelectedItem(){
+  return items.find(i => i.id === selectedId) || null;
+}
+
+function updateShapeColorPicker(){
+  // Farvevælgeren ligger nu direkte på den markerede figur.
+}
+
+function setSelectedShapeColor(color){
+  const item = getSelectedItem();
+  if (!item) return;
+  item.color = color;
   render();
 }
 
@@ -584,6 +609,7 @@ function drawWall(w, preview){
 }
 
 function render(){
+  updateShapeColorPicker();
   canvas.innerHTML="";
 
   if (paintMode) {
@@ -603,6 +629,8 @@ function render(){
     cell.style.height=GRID_SIZE+"px";
     cell.style.background=color;
     cell.style.opacity=0.4;
+    // Gør at man kan starte Shift-sletning direkte oven på et farvet felt.
+    cell.style.pointerEvents="none";
 
     canvas.appendChild(cell);
   });
@@ -665,6 +693,23 @@ function render(){
     el.appendChild(r);
 
     if(item.id===selectedId){
+      const colorInput = document.createElement("input");
+      colorInput.type = "color";
+      colorInput.className = "shape-color-inline";
+      colorInput.title = "Skift figurens farve";
+      colorInput.value = item.color || "#3b82f6";
+      colorInput.addEventListener("mousedown", e => e.stopPropagation());
+      colorInput.addEventListener("click", e => e.stopPropagation());
+      colorInput.addEventListener("input", e => {
+        item.color = e.target.value;
+        el.style.background = item.color;
+      });
+      colorInput.addEventListener("change", e => {
+        item.color = e.target.value;
+        render();
+      });
+      el.appendChild(colorInput);
+
       const rot=document.createElement("div");
       rot.className="rotator";
 
