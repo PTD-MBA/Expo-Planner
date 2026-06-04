@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <title>Expo Planner - V.1.4</title>
+<link rel="icon" type="image/x-icon" href="images/Expo_Planner_FAVICON.png">
 
 <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 
@@ -16,9 +17,10 @@ body {
 .toolbar {
   display: none;
   position: fixed;
-  top: 20px;
+  top: 38px;
   left: 50%;
   transform: translateX(-50%);
+  z-index: 2400;
   gap: 10px;
   padding: 10px 15px;
   border-radius: 12px;
@@ -44,9 +46,13 @@ button {
   outline: 2px solid #111;
 }
 
+.names-active {
+  outline: 2px solid #f59e0b;
+}
+
 #canvas {
   position: relative;
-  margin: 100px auto;
+  margin: 130px auto 10px auto;
   border-radius: 16px;
   background: white;
   box-shadow: 0 20px 40px rgba(0,0,0,0.08);
@@ -136,29 +142,44 @@ button {
 }
 
 input.name-input {
-  width: 100%;
-  border: none;
+  position: absolute;
+  left: 50%;
+  top: -34px;
+  transform: translateX(-50%);
+  min-width: 40px;
+  max-width: none;
+  border: 1px solid #cbd5e1;
   text-align: center;
-  background: rgba(255,255,255,0.9);
-  border-radius: 5px;
-  padding: 3px 4px;
-  box-sizing: border-box;
-  font-size: 12px;
-}
-
-.export-name-text {
-  width: 100%;
-  min-height: 20px;
-  text-align: center;
-  background: rgba(255,255,255,0.9);
-  border-radius: 5px;
-  padding: 3px 4px;
+  background: rgba(255,255,255,0.95);
+  border-radius: 6px;
+  padding: 2px 4px;
   box-sizing: border-box;
   font-size: 12px;
   color: #111827;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.12);
+  z-index: 3;
+}
+
+.export-name-text {
+  position: absolute;
+  left: 50%;
+  top: -34px;
+  transform: translateX(-50%);
+  min-width: 40px;
+  max-width: none;
+  min-height: 20px;
+  text-align: center;
+  background: rgba(255,255,255,0.95);
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  padding: 2px 4px;
+  box-sizing: border-box;
+  font-size: 12px;
+  color: #111827;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.12);
   overflow: visible;
-  white-space: normal;
-  word-break: break-word;
+  white-space: nowrap;
+  z-index: 3;
 }
 
 .box-size {
@@ -170,6 +191,59 @@ input.name-input {
   font-weight: 600;
   font-size: 11px;
   line-height: 1.2;
+}
+
+.text-box {
+  position: absolute;
+  z-index: 20;
+  cursor: move;
+  transform-origin: center;
+}
+
+.text-box.selected-text {
+  outline: 2px solid #ef4444;
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+.text-box-input {
+  border: 1px solid #cbd5e1;
+  border-radius: 5px;
+  background: rgba(255,255,255,0.95);
+  color: #111827;
+  padding: 2px 4px;
+  font-size: 13px;
+  font-family: "Segoe UI", Arial, sans-serif;
+  box-sizing: content-box;
+  width: 50px;
+  min-width: 30px;
+  max-width: none;
+  white-space: nowrap;
+  text-align: center;
+  cursor: move;
+  user-select: none;
+}
+
+.text-box-input.editing {
+  cursor: text;
+  user-select: text;
+  outline: 2px solid #3b82f6;
+  outline-offset: 1px;
+}
+
+.export-text-box-text {
+  display: inline-block;
+  border: 1px solid #cbd5e1;
+  border-radius: 5px;
+  background: rgba(255,255,255,0.95);
+  color: #111827;
+  padding: 2px 4px;
+  font-size: 13px;
+  font-family: "Segoe UI", Arial, sans-serif;
+  line-height: 1.2;
+  white-space: nowrap;
+  text-align: center;
+  box-sizing: content-box;
 }
 
 #setup {
@@ -199,46 +273,303 @@ input.name-input {
   flex-direction: column;
   font-size: 13px;
 }
+
+#newSheetBtn{
+  display:none;
+  position:fixed;
+  top:20px;
+  right:20px;
+  z-index:2000;
+  border:none;
+  padding:10px 14px;
+  border-radius:10px;
+  background:#16a34a;
+  color:white;
+  cursor:pointer;
+  box-shadow:0 4px 10px rgba(0,0,0,0.15);
+}
+
+
+#autosaveStatus{
+  position:fixed;
+  top:2px;
+  left:50%;
+  transform:translateX(-50%);
+  z-index:2600;
+  padding:5px 8px;
+  border-radius:8px;
+  background:rgba(15,23,42,0.08);
+  color:#334155;
+  font-size:12px;
+  white-space:nowrap;
+}
+
+#autosaveDialog{
+  position:fixed;
+  inset:0;
+  z-index:3000;
+  background:rgba(15,23,42,0.55);
+  display:none;
+  align-items:center;
+  justify-content:center;
+}
+
+#autosaveDialogBox{
+  width:340px;
+  background:white;
+  border-radius:16px;
+  padding:20px;
+  box-shadow:0 20px 50px rgba(0,0,0,0.25);
+  font-family:"Segoe UI", Arial, sans-serif;
+}
+
+#autosaveDialogBox h3{
+  margin:0 0 10px;
+}
+
+#autosaveDialogBox p{
+  margin:8px 0;
+  color:#475569;
+  font-size:14px;
+}
+
+#autosaveDetails{
+  margin:12px 0;
+  padding:10px;
+  border-radius:10px;
+  background:#f1f5f9;
+  color:#334155;
+  font-size:13px;
+  line-height:1.5;
+}
+
+.autosave-actions{
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+  margin-top:14px;
+}
+
+.autosave-actions button{
+  flex:1;
+  min-width:100px;
+}
+
+button.secondary{
+  background:#64748b;
+}
+
+button.danger{
+  background:#ef4444;
+}
+
+#newSheetChoiceDialog{
+  position:fixed;
+  inset:0;
+  z-index:3100;
+  background:rgba(15,23,42,0.55);
+  display:none;
+  align-items:center;
+  justify-content:center;
+}
+
+#newSheetChoiceBox{
+  width:360px;
+  background:white;
+  border-radius:16px;
+  padding:20px;
+  box-shadow:0 20px 50px rgba(0,0,0,0.25);
+}
+
+#newSheetChoiceBox h3{
+  margin:0 0 10px;
+}
+
+#newSheetChoiceBox p{
+  margin:8px 0 14px;
+  color:#475569;
+  font-size:14px;
+}
+
+.new-sheet-actions{
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+}
+
+.new-sheet-actions button{
+  flex:1;
+  min-width:105px;
+}
+
+
+body.export-force-figure-names .name-input,
+body.export-force-figure-names .figure-name,
+body.export-force-figure-names .box-name,
+body.export-force-figure-names .name-wrapper {
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+
+
+.painted-cell {
+  position: absolute;
+  pointer-events: none;
+}
+
+
+#paintColorInput::-webkit-color-swatch-wrapper{
+  padding:0;
+}
+
+
+
+
+
+
+#setupLogo{
+  width: 230px;
+  max-width: 90%;
+  height: auto;
+  display: block;
+  margin: 0 auto 16px;
+}
+
+
+
+
+#expoLogo{
+  position:fixed;
+  top:8px;
+  left:10px;
+  z-index:2200;
+  pointer-events:none;
+}
+
+#expoLogo img{
+  height:95px;
+  width:auto;
+  opacity:0.95;
+}
+
+
+
+
+
+
+
+
+#footerCopyright{
+  width:100%;
+  text-align:center;
+  margin:0;
+  padding:0 0 8px 0;
+  color:#64748b;
+  font-size:12px;
+  font-family:"Segoe UI", Arial, sans-serif;
+}
+
+
+.export-copyright-watermark{
+  position:absolute;
+  right:12px;
+  bottom:12px;
+  font-size:12px;
+  color:#64748b;
+  background:rgba(255,255,255,0.85);
+  border:1px solid rgba(15,23,42,0.08);
+  border-radius:6px;
+  padding:4px 8px;
+  font-family:"Segoe UI", Arial, sans-serif;
+  z-index:9999;
+}
+
 </style>
 </head>
 
 <body>
 
+<div id="expoLogo">
+  <img src="images/Expo_Planner_logo.png" alt="Expo Planner Logo">
+</div>
+
+
 <div id="setup">
   <div id="setupBox">
-    <h3>Expo Planner</h3>
+    
+    <img id="setupLogo" src="images/Expo_Planner_logo.png" alt="Expo Planner Logo">
 
-    <button onclick="showNew()">🆕 Create New</button>
-    <button onclick="fileInput.click()">📂 Load Layout</button>
+
+    <button onclick="showNew()" title="Create a new layout from scratch">🆕 Create New</button>
+    <button onclick="fileInput.click()" title="Open a previously saved layout file">📂 Open Layout</button>
 
     <div id="newSetup" style="display:none">
       <label>Width (m)<input id="widthInput" type="number" value="47"></label>
       <label>Height (m)<input id="heightInput" type="number" value="17"></label>
-      <button onclick="initCanvas()">Start</button>
+      <button onclick="initCanvas()" title="Start with the selected layout size">Start</button>
     </div>
   </div>
 </div>
 
 <div class="toolbar">
-  <button onclick="addBox()" title="Tilføj figur">➕</button>
-    <button onclick="saveLayout()">💾</button>
-  <button onclick="exportPNG()" title="Eksporter tegningen som PNG">🖼️ PNG</button>
-  <button onclick="fileInput.click()">📂</button>
+<button onclick="addBox()" title="Add booth. Hold ALT while moving or resizing for 0.5 meter precision.">➕</button>
+  <button onclick="addTextBox()" title="Add a free text box to the layout.">📝</button>
+    <button onclick="saveLayout()" title="Save layout as a JSON file">💾</button>
+  <button onclick="exportPNG()" title="Export the layout as a PNG image">🖼️ PNG</button>
+  <button onclick="fileInput.click()" title="Open a saved layout file">📂</button>
+  
 
-  <button id="paintBtn" onclick="togglePaint()" title="Mal felter. Hold Shift nede for at slette. Hold Ctrl nede og træk for at male et rektangel.">🎨</button>
+  <button id="paintBtn" onclick="togglePaint()" title="Paint grid cells. Hold Shift to erase. Hold Ctrl/Cmd and drag to paint a rectangle.">🎨</button>
   <!-- ✅ NEW -->
-  <button id="wallBtn" onclick="toggleWall()">🧱</button>
+  <button id="wallBtn" onclick="toggleWall()" title="Draw walls. Click and drag on the grid.">🧱</button>
+  <button id="namesBtn" class="names-active" onclick="toggleFigureNames()" title="Show or hide booth labels on the grid">🔤 Labels</button>
 
-  <label title="Farve til mal-funktionen">
+  <label title="Color used for painting grid cells">
     🎨 Grid
-    <input type="color" id="paintColorInput" value="#22c55e" onchange="paintColor=this.value">
+    <input type="color" id="paintColorInput" value="#22c55e" onchange="paintColor=this.value" title="Choose grid paint color" style="-webkit-appearance:none;">
+    <button type="button" id="gridPipetteBtn" onclick="toggleGridPipette()" title="Eyedropper: click a painted grid cell to copy its original color">🧪</button>
   </label>
 
 
   <input type="file" id="fileInput" hidden>
 </div>
 
+
+
+
+<div id="autosaveStatus" title="Autosave status">Autosave: ikke gemt</div>
+
 <div id="canvas"></div>
+
+<button id="newSheetBtn" onclick="createNewSheet()" title="Create a new empty layout without reloading the page">📄 New Layout</button>
+
+<div id="autosaveDialog">
+  <div id="autosaveDialogBox">
+    <h3>Restore Previous Planner?</h3>
+    <p>An autosave from your previous session was found.</p>
+    <div id="autosaveDetails"></div>
+    <div class="autosave-actions">
+      <button onclick="restoreAutosaveFromDialog()">Restore Autosave</button>
+      <button class="secondary" onclick="startFreshFromAutosaveDialog()">Start New</button>
+      <button class="danger" onclick="deleteAutosaveFromDialog()">Delete Autosave</button>
+    </div>
+  </div>
+</div>
+
+<div id="newSheetChoiceDialog">
+  <div id="newSheetChoiceBox">
+    <h3>Create New Layout?</h3>
+    <p>Would you like to save the current layout first?</p>
+    <div class="new-sheet-actions">
+      <button onclick="saveBeforeNewSheet()">Save First</button>
+      <button class="danger" onclick="createNewSheetConfirmed()">Continue Without Saving</button>
+      <button class="secondary" onclick="closeNewSheetChoice()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+
 
 <script>
 const GRID_SIZE = 40;
@@ -252,6 +583,8 @@ const shapeColorInput = document.getElementById("shapeColorInput");
 const paintColorInput = document.getElementById("paintColorInput");
 
 let paintMode = false;
+let pickGridColorMode = false;
+let showFigureNames = true;
 let paintColor = "#22c55e";
 let paintedCells = {};
 let isPainting = false;
@@ -277,6 +610,14 @@ let selectedId = null;
 let nextId = 1;
 let copiedItem = null;
 
+let textBoxes = [];
+let selectedTextId = null;
+let nextTextId = 1;
+let currentTextBox = null;
+let draggingTextBox = false;
+let textDragOffsetX = 0;
+let textDragOffsetY = 0;
+
 let currentItem = null;
 let dragging = false;
 let resizing = false;
@@ -285,7 +626,59 @@ let undoStack = [];
 let isRestoringState = false;
 let autosaveTimer = null;
 let lastAutosaveAt = null;
-const AUTOSAVE_KEY = "expoPlannerAutosaveV1";
+const AUTOSAVE_INDEX_KEY = "expoPlannerAutosaveIndexV2";
+let currentLayoutId = null;
+let pendingAutosaveLayout = null;
+
+function getOrCreateLayoutId(){
+  if (!currentLayoutId) {
+    currentLayoutId = "layout-" + Date.now() + "-" + Math.random().toString(36).slice(2, 8);
+  }
+  return currentLayoutId;
+}
+
+function getAutosaveKey(layoutId){
+  return `expoPlannerAutosaveV2:${layoutId}`;
+}
+
+function readAutosaveIndex(){
+  try {
+    return JSON.parse(localStorage.getItem(AUTOSAVE_INDEX_KEY) || "[]");
+  } catch {
+    return [];
+  }
+}
+
+function writeAutosaveIndex(index){
+  localStorage.setItem(AUTOSAVE_INDEX_KEY, JSON.stringify(index));
+}
+
+function upsertAutosaveIndexEntry(layout){
+  const layoutId = layout.layoutId;
+  let index = readAutosaveIndex().filter(entry => entry.layoutId !== layoutId);
+
+  index.unshift({
+    layoutId,
+    savedAt: layout.savedAt,
+    canvasWidthM: layout.state?.canvasWidthM,
+    canvasHeightM: layout.state?.canvasHeightM,
+    itemCount: layout.state?.items?.length || 0,
+    textBoxCount: layout.state?.textBoxes?.length || 0,
+    wallCount: layout.state?.walls?.length || 0
+  });
+
+  index = index.slice(0, 10);
+  writeAutosaveIndex(index);
+}
+
+function updateAutosaveStatus(text){
+  const status = document.getElementById("autosaveStatus");
+  if (status) status.textContent = text;
+}
+
+function formatAutosaveTime(date){
+  return date.toLocaleTimeString("da-DK", { hour:"2-digit", minute:"2-digit" });
+}
 let activePaintKeys = new Set();
 let paintingRect = false;
 let paintRectStart = null;
@@ -293,6 +686,10 @@ let paintRectPreview = null;
 let paintRectErase = false;
 
 const snap = v => Math.floor(v / GRID_SIZE) * GRID_SIZE;
+const snapByEvent = (v, e) => {
+  const size = e && e.altKey ? GRID_SIZE / 2 : GRID_SIZE;
+  return Math.floor(v / size) * size;
+};
 
 function clonePlain(value){
   return JSON.parse(JSON.stringify(value));
@@ -301,12 +698,16 @@ function clonePlain(value){
 function createSnapshot(){
   return {
     items: clonePlain(items),
+    textBoxes: clonePlain(textBoxes),
     walls: clonePlain(walls),
     paintedCells: clonePlain(paintedCells),
     selectedId,
+    selectedTextId,
     selectedWallIds: Array.from(selectedWallIds),
     nextId,
+    nextTextId,
     nextWallId,
+    showFigureNames,
     canvasWidthM,
     canvasHeightM
   };
@@ -316,19 +717,26 @@ function restoreSnapshot(snapshot){
   isRestoringState = true;
 
   items = clonePlain(snapshot.items || []);
+  textBoxes = clonePlain(snapshot.textBoxes || []);
   walls = clonePlain(snapshot.walls || []);
   paintedCells = clonePlain(snapshot.paintedCells || {});
   selectedId = snapshot.selectedId ?? null;
+  selectedTextId = snapshot.selectedTextId ?? null;
   selectedWallIds = new Set(snapshot.selectedWallIds || []);
   nextId = snapshot.nextId || 1;
+  nextTextId = snapshot.nextTextId || 1;
   nextWallId = snapshot.nextWallId || 1;
+  showFigureNames = snapshot.showFigureNames !== false;
   canvasWidthM = snapshot.canvasWidthM || canvasWidthM;
+  updateFigureNamesButton();
   canvasHeightM = snapshot.canvasHeightM || canvasHeightM;
 
   drawingWall = false;
   wallStart = null;
   wallPreview = null;
   currentItem = null;
+  currentTextBox = null;
+  draggingTextBox = false;
   dragging = false;
   resizing = false;
   rotating = false;
@@ -365,6 +773,7 @@ function getLayoutState(){
   return {
     app: "Expo Planner",
     version: "1.5",
+    layoutId: getOrCreateLayoutId(),
     savedAt: new Date().toISOString(),
     state: createSnapshot()
   };
@@ -372,11 +781,14 @@ function getLayoutState(){
 
 function applyLayoutState(layout){
   const snapshot = layout && layout.state ? layout.state : layout;
-  if (!snapshot) throw new Error("Layoutfilen mangler data.");
+  if (!snapshot) throw new Error("The layout file is missing data.");
+
+  currentLayoutId = layout && layout.layoutId ? layout.layoutId : "layout-" + Date.now() + "-" + Math.random().toString(36).slice(2, 8);
 
   restoreSnapshot(snapshot);
   setup.style.display = "none";
   toolbar.style.display = "flex";
+    document.getElementById("newSheetBtn").style.display = "block";
   saveAutosaveNow();
 }
 
@@ -390,46 +802,125 @@ function downloadTextFile(filename, text){
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-function saveLayout(){
+async function saveLayout(){
   saveAutosaveNow();
 
   const now = new Date();
   const stamp = now.toISOString().slice(0,19).replace(/[:T]/g,"-");
-  downloadTextFile(`expo-planner-${stamp}.json`, JSON.stringify(getLayoutState(), null, 2));
+  const filename = `expo-planner-${stamp}.json`;
+  const content = JSON.stringify(getLayoutState(), null, 2);
+
+  try {
+    if (window.showSaveFilePicker) {
+      const handle = await window.showSaveFilePicker({
+        suggestedName: filename,
+        types: [{
+          description: "Expo Planner Layout",
+          accept: { "application/json": [".json"] }
+        }]
+      });
+
+      const writable = await handle.createWritable();
+      await writable.write(content);
+      await writable.close();
+      updateAutosaveStatus("Gemt som fil kl. " + formatAutosaveTime(new Date()));
+    } else {
+      downloadTextFile(filename, content);
+      updateAutosaveStatus("Downloadet fil kl. " + formatAutosaveTime(new Date()));
+    }
+  } catch (err) {
+    if (err && err.name !== "AbortError") {
+      console.error(err);
+      downloadTextFile(filename, content);
+    }
+  }
 }
 
 function saveAutosaveNow(){
   try {
-    localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(getLayoutState()));
+    updateAutosaveStatus("Saving autosave...");
+
+    const layout = getLayoutState();
+    localStorage.setItem(getAutosaveKey(layout.layoutId), JSON.stringify(layout));
+    upsertAutosaveIndexEntry(layout);
+
     lastAutosaveAt = new Date();
+    updateAutosaveStatus("Autosaved at " + formatAutosaveTime(lastAutosaveAt));
   } catch (err) {
-    console.warn("Autosave kunne ikke gemmes", err);
+    updateAutosaveStatus("Autosave failed");
+    console.warn("Autosave could not be saved", err);
   }
 }
 
 function scheduleAutosave(){
   if (isRestoringState) return;
+  updateAutosaveStatus("Unsaved changes");
   clearTimeout(autosaveTimer);
   autosaveTimer = setTimeout(saveAutosaveNow, 400);
 }
 
-function tryRestoreAutosave(){
-  try {
-    const raw = localStorage.getItem(AUTOSAVE_KEY);
-    if (!raw) return;
+function getLatestAutosave(){
+  const index = readAutosaveIndex();
+  if (!index.length) return null;
 
-    const layout = JSON.parse(raw);
-    const savedAt = layout.savedAt ? new Date(layout.savedAt) : null;
-    const label = savedAt && !Number.isNaN(savedAt.getTime())
-      ? savedAt.toLocaleString("da-DK")
-      : "ukendt tidspunkt";
-
-    if (confirm(`Der findes en autosave fra ${label}. Vil du åbne den?`)) {
-      applyLayoutState(layout);
+  for (const entry of index) {
+    try {
+      const raw = localStorage.getItem(getAutosaveKey(entry.layoutId));
+      if (!raw) continue;
+      return JSON.parse(raw);
+    } catch (err) {
+      console.warn("Autosave could not be read", err);
     }
-  } catch (err) {
-    console.warn("Autosave kunne ikke indlæses", err);
   }
+
+  return null;
+}
+
+function describeAutosave(layout){
+  const savedAt = layout.savedAt ? new Date(layout.savedAt) : null;
+  const label = savedAt && !Number.isNaN(savedAt.getTime())
+    ? savedAt.toLocaleString("da-DK")
+    : "unknown";
+
+  const state = layout.state || {};
+  return `
+    <strong>Sidst gemt:</strong> ${label}<br>
+    <strong>Size:</strong> ${state.canvasWidthM || "?"} × ${state.canvasHeightM || "?"} m<br>
+    <strong>Content:</strong> ${(state.items || []).length} booths · ${(state.textBoxes || []).length} text boxes · ${(state.walls || []).length} walls
+  `;
+}
+
+function tryRestoreAutosave(){
+  pendingAutosaveLayout = getLatestAutosave();
+  if (!pendingAutosaveLayout) return;
+
+  const dialog = document.getElementById("autosaveDialog");
+  const details = document.getElementById("autosaveDetails");
+
+  if (details) details.innerHTML = describeAutosave(pendingAutosaveLayout);
+  if (dialog) dialog.style.display = "flex";
+}
+
+function restoreAutosaveFromDialog(){
+  if (!pendingAutosaveLayout) return;
+  document.getElementById("autosaveDialog").style.display = "none";
+  applyLayoutState(pendingAutosaveLayout);
+  pendingAutosaveLayout = null;
+}
+
+function startFreshFromAutosaveDialog(){
+  document.getElementById("autosaveDialog").style.display = "none";
+  pendingAutosaveLayout = null;
+}
+
+function deleteAutosaveFromDialog(){
+  if (pendingAutosaveLayout && pendingAutosaveLayout.layoutId) {
+    localStorage.removeItem(getAutosaveKey(pendingAutosaveLayout.layoutId));
+    writeAutosaveIndex(readAutosaveIndex().filter(entry => entry.layoutId !== pendingAutosaveLayout.layoutId));
+  }
+
+  document.getElementById("autosaveDialog").style.display = "none";
+  pendingAutosaveLayout = null;
 }
 
 function loadLayoutFile(file){
@@ -441,14 +932,14 @@ function loadLayoutFile(file){
       const layout = JSON.parse(reader.result);
       applyLayoutState(layout);
     } catch (err) {
-      alert("Layoutfilen kunne ikke indlæses. Vælg en gyldig Expo Planner .json-fil.");
+      alert("The layout file could not be loaded. Please select a valid Expo Planner .json file.");
       console.error(err);
     } finally {
       fileInput.value = "";
     }
   };
   reader.onerror = () => {
-    alert("Filen kunne ikke læses.");
+    alert("The file could not be read.");
     fileInput.value = "";
   };
   reader.readAsText(file);
@@ -472,6 +963,20 @@ function togglePaint(){
   render();
 }
 
+
+function toggleGridPipette(){
+  pickGridColorMode = !pickGridColorMode;
+  paintMode = false;
+  wallMode = false;
+
+  const btn = document.getElementById("gridPipetteBtn");
+  if (btn) btn.classList.toggle("paint-active", pickGridColorMode);
+
+  paintBtn.classList.remove("paint-active");
+  wallBtn.classList.remove("wall-active");
+  canvas.classList.remove("canvas-paint");
+}
+
 /* ✅ NEW */
 function toggleWall(){
   wallMode = !wallMode;
@@ -483,18 +988,43 @@ function toggleWall(){
   canvas.classList.remove("canvas-paint");
 }
 
+function updateFigureNamesButton(){
+  if (!window.namesBtn) return;
+  namesBtn.classList.toggle("names-active", showFigureNames);
+  namesBtn.textContent = showFigureNames ? "🔤 Labels" : "🔤 Labels skjult";
+}
+
+function toggleFigureNames(){
+  showFigureNames = !showFigureNames;
+  updateFigureNamesButton();
+  render();
+}
+
+function resizeNameInput(input, item){
+  const text = input.value || input.placeholder || "";
+  const charWidth = 7.5;
+  const extraPadding = 34;
+  const wantedWidth = Math.ceil(text.length * charWidth + extraPadding);
+  input.style.width = Math.max(item.w, 120, wantedWidth) + "px";
+}
+
+
 function updateCanvasSize(){
   canvas.style.width = canvasWidthM * GRID_SIZE + "px";
   canvas.style.height = canvasHeightM * GRID_SIZE + "px";
 }
 
 function initCanvas(){
+  currentLayoutId = null;
+  getOrCreateLayoutId();
+
   canvasWidthM = parseInt(widthInput.value)||10;
   canvasHeightM = parseInt(heightInput.value)||10;
 
   updateCanvasSize();
   setup.style.display="none";
   toolbar.style.display="flex";
+    document.getElementById("newSheetBtn").style.display = "block";
   render();
 }
 
@@ -504,13 +1034,33 @@ function addBox(){
     id: nextId++,
     x: 0, y: 0, w: 80, h: 80,
     angle: 0,
-    name: "Ny stand",
+    name: "New Booth",
     color: "#3b82f6"
   };
   items.push(item);
   selectedId = item.id;
   selectedWallIds.clear();
+  selectedTextId = null;
   render();
+  saveAutosaveNow();
+}
+
+
+function addTextBox(){
+  pushUndo();
+  const textBox = {
+    id: nextTextId++,
+    x: 0,
+    y: 0,
+    text: "Ny tekst"
+  };
+  textBoxes.push(textBox);
+  selectedTextId = textBox.id;
+  selectedId = null;
+  selectedWallIds.clear();
+  showFigureNames = true;
+  render();
+  saveAutosaveNow();
 }
 
 function getSelectedItem(){
@@ -572,9 +1122,14 @@ function setSelectedShapeColor(color){
 }
 
 function removeSelected(){
-  if (selectedId === null && !selectedWallIds.size) return;
+  if (selectedId === null && selectedTextId === null && !selectedWallIds.size) return;
   pushUndo();
   items = items.filter(i => i.id !== selectedId);
+
+  if (selectedTextId !== null) {
+    textBoxes = textBoxes.filter(t => t.id !== selectedTextId);
+    selectedTextId = null;
+  }
 
   if (selectedWallIds.size) {
     walls = walls.filter(w => !selectedWallIds.has(w.id));
@@ -583,6 +1138,30 @@ function removeSelected(){
 
   selectedId = null;
   render();
+  saveAutosaveNow();
+}
+
+
+function hexToRgba(hex, alpha){
+  if (!hex || typeof hex !== "string") return hex;
+
+  let value = hex.trim();
+
+  if (value.startsWith("#")) value = value.slice(1);
+
+  if (value.length === 3) {
+    value = value.split("").map(ch => ch + ch).join("");
+  }
+
+  if (value.length !== 6) return hex;
+
+  const r = parseInt(value.slice(0, 2), 16);
+  const g = parseInt(value.slice(2, 4), 16);
+  const b = parseInt(value.slice(4, 6), 16);
+
+  if ([r, g, b].some(Number.isNaN)) return hex;
+
+  return `rgba(${r},${g},${b},${alpha})`;
 }
 
 function paintAtEvent(e){
@@ -603,6 +1182,21 @@ function paintAtEvent(e){
   }
 
   render();
+}
+
+
+function pickColorFromGridEvent(e){
+  const { gx, gy } = getGridCellFromEvent(e);
+  const key = (gx * GRID_SIZE) + "," + (gy * GRID_SIZE);
+  const originalColor = paintedCells[key];
+
+  if (originalColor) {
+    paintColor = originalColor;
+    if (paintColorInput) paintColorInput.value = originalColor;
+    return true;
+  }
+
+  return false;
 }
 
 function getGridCellFromEvent(e){
@@ -675,15 +1269,15 @@ function clampItemSizeToCanvas(item){
   const maxW = Math.max(GRID_SIZE, canvas.offsetWidth - item.x);
   const maxH = Math.max(GRID_SIZE, canvas.offsetHeight - item.y);
 
-  item.w = Math.max(GRID_SIZE, Math.min(item.w, maxW));
-  item.h = Math.max(GRID_SIZE, Math.min(item.h, maxH));
+  item.w = Math.max(GRID_SIZE / 2, Math.min(item.w, maxW));
+  item.h = Math.max(GRID_SIZE / 2, Math.min(item.h, maxH));
 }
 
 function normalizeWall(start, end){
   let nx = end.x;
   let ny = end.y;
 
-  // Hold vægge enten vandrette eller lodrette.
+  // Hold walls enten vandrette eller lodrette.
   if (Math.abs(nx - start.x) >= Math.abs(ny - start.y)) {
     ny = start.y;
   } else {
@@ -727,9 +1321,27 @@ canvas.addEventListener("pointerdown", (e) => {
 
   const p = clampPointToCanvas(getCanvasPoint(e));
 
+  if (pickGridColorMode) {
+    const { gx, gy } = getGridCellFromEvent(e);
+    const key = (gx * GRID_SIZE) + "," + (gy * GRID_SIZE);
+    const originalColor = paintedCells[key];
+
+    if (originalColor) {
+      paintColor = originalColor;
+      paintColorInput.value = originalColor;
+      pickGridColorMode = false;
+      const btn = document.getElementById("gridPipetteBtn");
+      if (btn) btn.classList.remove("paint-active");
+    }
+
+    e.preventDefault();
+    return;
+  }
+
   if (!paintMode && !wallMode) {
     selectedWallIds.clear();
     selectedId = null;
+    selectedTextId = null;
     render();
   }
 
@@ -794,6 +1406,14 @@ canvas.addEventListener("pointerup", (e) => {
 
   if (drawingWall) finishWallDrawing();
 
+  draggingTextBox=false;
+  currentTextBox=null;
+  draggingTextBox=false;
+  currentTextBox=null;
+  draggingTextBox=false;
+  currentTextBox=null;
+  draggingTextBox=false;
+  currentTextBox=null;
   dragging=false;
   resizing=false;
   rotating=false;
@@ -810,6 +1430,14 @@ canvas.addEventListener("pointercancel", (e) => {
   drawingWall=false;
   wallPreview=null;
   wallStart=null;
+  draggingTextBox=false;
+  currentTextBox=null;
+  draggingTextBox=false;
+  currentTextBox=null;
+  draggingTextBox=false;
+  currentTextBox=null;
+  draggingTextBox=false;
+  currentTextBox=null;
   dragging=false;
   resizing=false;
   rotating=false;
@@ -836,6 +1464,14 @@ document.addEventListener("mouseup", () => {
 
   if (drawingWall) finishWallDrawing();
 
+  draggingTextBox=false;
+  currentTextBox=null;
+  draggingTextBox=false;
+  currentTextBox=null;
+  draggingTextBox=false;
+  currentTextBox=null;
+  draggingTextBox=false;
+  currentTextBox=null;
   dragging=false;
   resizing=false;
   rotating=false;
@@ -883,6 +1519,12 @@ document.addEventListener("keydown", e => {
       return;
     }
 
+    if (selectedTextId !== null) {
+      e.preventDefault();
+      removeSelected();
+      return;
+    }
+
     if (selectedId !== null) {
       e.preventDefault();
       removeSelected();
@@ -891,21 +1533,29 @@ document.addEventListener("keydown", e => {
 });
 
 document.addEventListener("mousemove", e=>{
-  if(!currentItem) return;
+  if(!currentItem && !currentTextBox) return;
   const r = canvas.getBoundingClientRect();
   const x = e.clientX - r.left;
   const y = e.clientY - r.top;
 
+  if(draggingTextBox && currentTextBox){
+    currentTextBox.x = Math.max(0, Math.min(x - textDragOffsetX, canvas.offsetWidth - 20));
+    currentTextBox.y = Math.max(0, Math.min(y - textDragOffsetY, canvas.offsetHeight - 20));
+    render();
+    return;
+  }
+
   if(dragging){
-    currentItem.x = snap(x - currentItem.w/2);
-    currentItem.y = snap(y - currentItem.h/2);
+    currentItem.x = snapByEvent(x - currentItem.w/2, e);
+    currentItem.y = snapByEvent(y - currentItem.h/2, e);
     clampItemToCanvas(currentItem);
     render();
   }
 
   if(resizing){
-    currentItem.w = Math.max(GRID_SIZE, snap(x - currentItem.x));
-    currentItem.h = Math.max(GRID_SIZE, snap(y - currentItem.y));
+    const minSize = e.altKey ? GRID_SIZE / 2 : GRID_SIZE;
+    currentItem.w = Math.max(minSize, snapByEvent(x - currentItem.x, e));
+    currentItem.h = Math.max(minSize, snapByEvent(y - currentItem.y, e));
     clampItemSizeToCanvas(currentItem);
     render();
   }
@@ -940,16 +1590,19 @@ function getItemSizeText(item){
 
 
 async function exportPNG(){
-  // Gem valgt tilstand, så eksporten bliver ren uden markeringer/håndtag.
+  // Save the selected state so the export is clean without selections/handles.
   const savedSelectedId = selectedId;
   const savedSelectedWallIds = new Set(selectedWallIds);
+  const savedShowFigureNames = showFigureNames;
 
   selectedId = null;
   selectedWallIds.clear();
+  showFigureNames = true;
+  updateFigureNamesButton();
   render();
 
   try {
-    // Vent et øjeblik, så DOM'en når at opdatere før html2canvas tager snapshot.
+    // Wait briefly so the DOM can update before html2canvas takes the snapshot.
     await new Promise(resolve => requestAnimationFrame(resolve));
 
     if (document.fonts && document.fonts.ready) {
@@ -961,12 +1614,40 @@ async function exportPNG(){
       scale: 2,
       useCORS: true,
       onclone: (clonedDocument) => {
+        clonedDocument.body.classList.add("export-force-figure-names");
+
+        clonedDocument.querySelectorAll(".name-input").forEach(input => {
+          input.style.display = "block";
+          input.style.visibility = "visible";
+          input.style.opacity = "1";
+          const parent = input.closest(".figure-name, .box-name, .name-wrapper");
+          if (parent) {
+            parent.style.display = "block";
+            parent.style.visibility = "visible";
+            parent.style.opacity = "1";
+          }
+        });
+
         // html2canvas kan beskære tekst inde i input-felter.
         // Derfor erstatter vi kun i eksport-kopien inputfelterne med almindelige divs.
         clonedDocument.querySelectorAll(".name-input").forEach(input => {
           const text = clonedDocument.createElement("div");
           text.className = "export-name-text";
           text.textContent = input.value || input.getAttribute("value") || "";
+          input.replaceWith(text);
+        });
+
+        
+        const copyright = clonedDocument.createElement("div");
+        copyright.className = "export-copyright-watermark";
+        copyright.textContent = "© Expo Planner - Mathias Andersen - mba@ptdefence.com";
+        clonedDocument.querySelector("#canvas").appendChild(copyright);
+
+clonedDocument.querySelectorAll(".text-box-input").forEach(input => {
+          const text = clonedDocument.createElement("div");
+          text.className = "export-text-box-text";
+          text.textContent = input.value || input.getAttribute("value") || "";
+          text.style.width = input.style.width || input.offsetWidth + "px";
           input.replaceWith(text);
         });
       }
@@ -978,9 +1659,12 @@ async function exportPNG(){
     link.download = `expo-planner-${stamp}.png`;
     link.href = imageCanvas.toDataURL("image/png");
     link.click();
+    saveAutosaveNow();
   } finally {
     selectedId = savedSelectedId;
     selectedWallIds = savedSelectedWallIds;
+    showFigureNames = savedShowFigureNames;
+    updateFigureNamesButton();
     render();
   }
 }
@@ -992,7 +1676,7 @@ function drawWall(w, preview){
   if(preview) d.style.opacity="0.5";
 
   if (!preview) {
-    d.title = "Klik for at vælge væg. Tryk Delete for at slette den valgte væg.";
+    d.title = "Click to select wall. Press Delete to remove the selected wall.";
     d.addEventListener("pointerdown", (e) => {
       e.preventDefault();
       e.stopPropagation();
@@ -1020,6 +1704,129 @@ function drawWall(w, preview){
   canvas.appendChild(d);
 }
 
+
+function updateTextInputWidth(input){
+  const text = input.value || input.placeholder || "";
+  input.style.width = Math.max(30, (text.length + 1) * 7) + "px";
+}
+
+function beginTextBoxDrag(e, tb){
+  e.preventDefault();
+  e.stopPropagation();
+
+  pushUndo();
+  draggingTextBox = true;
+  currentTextBox = tb;
+
+  const canvasRect = canvas.getBoundingClientRect();
+  textDragOffsetX = (e.clientX - canvasRect.left) - tb.x;
+  textDragOffsetY = (e.clientY - canvasRect.top) - tb.y;
+
+  selectedTextId = tb.id;
+  selectedId = null;
+  selectedWallIds.clear();
+
+  document.querySelectorAll(".text-box").forEach(box => box.classList.remove("selected-text"));
+  const boxEl = e.target.closest(".text-box");
+  if (boxEl) boxEl.classList.add("selected-text");
+}
+
+function startEditingTextBox(input, tb){
+  selectedTextId = tb.id;
+  selectedId = null;
+  selectedWallIds.clear();
+
+  input.readOnly = false;
+  input.classList.add("editing");
+  input.style.cursor = "text";
+  input.focus();
+  input.select();
+}
+
+function stopEditingTextBox(input){
+  input.readOnly = true;
+  input.classList.remove("editing");
+  input.style.cursor = "move";
+}
+
+function drawTextBox(tb){
+  if (!tb.id) tb.id = nextTextId++;
+
+  const el = document.createElement("div");
+  el.className = "text-box";
+  if (tb.id === selectedTextId) el.classList.add("selected-text");
+  el.style.left = tb.x + "px";
+  el.style.top = tb.y + "px";
+  el.title = "Drag to move. Double-click to edit. Press Delete to delete.";
+
+  const input = document.createElement("input");
+  input.className = "text-box-input";
+  input.type = "text";
+  input.value = tb.text || "";
+  input.placeholder = "Tekst";
+  input.readOnly = true;
+  updateTextInputWidth(input);
+
+  input.addEventListener("mousedown", e => {
+    if (input.readOnly) {
+      beginTextBoxDrag(e, tb);
+    } else {
+      e.stopPropagation();
+    }
+  });
+
+  function handleTextBoxDoubleClick(e){
+    e.preventDefault();
+    e.stopPropagation();
+    draggingTextBox = false;
+    currentTextBox = null;
+    startEditingTextBox(input, tb);
+  }
+
+  input.addEventListener("dblclick", handleTextBoxDoubleClick);
+  el.addEventListener("dblclick", handleTextBoxDoubleClick);
+
+  input.addEventListener("focus", () => {
+    if (input.readOnly) return;
+
+    if (input.dataset.undoStarted === "1") return;
+    input.dataset.undoStarted = "1";
+    pushUndo();
+  });
+
+  input.addEventListener("blur", () => {
+    input.dataset.undoStarted = "0";
+    stopEditingTextBox(input);
+  });
+
+  input.addEventListener("keydown", e => {
+    if (input.readOnly && e.key === "Enter") {
+      e.preventDefault();
+      startEditingTextBox(input, tb);
+      return;
+    }
+
+    if (!input.readOnly && (e.key === "Enter" || e.key === "Escape")) {
+      e.preventDefault();
+      input.blur();
+    }
+  });
+
+  input.addEventListener("input", e => {
+    tb.text = e.target.value;
+    updateTextInputWidth(input);
+    scheduleAutosave();
+  });
+
+  el.appendChild(input);
+
+  el.addEventListener("mousedown", e => {
+    beginTextBoxDrag(e, tb);
+  });
+
+  canvas.appendChild(el);
+}
+
 function render(){
   updateShapeColorPicker();
   canvas.innerHTML="";
@@ -1034,15 +1841,16 @@ function render(){
     const [x, y] = key.split(",").map(Number);
 
     const cell = document.createElement("div");
-    cell.style.position="absolute";
+    cell.className = "painted-cell";
     cell.style.left=x+"px";
     cell.style.top=y+"px";
     cell.style.width=GRID_SIZE+"px";
     cell.style.height=GRID_SIZE+"px";
-    cell.style.background=color;
-    cell.style.opacity=0.4;
-    // Gør at man kan starte Shift-sletning direkte oven på et farvet felt.
-    cell.style.pointerEvents="none";
+
+    // Vis gridfarven transparent, så griddet stadig kan ses.
+    // Originalfarven gemmes separat og bruges af 🧪-pipetten.
+    cell.style.background = hexToRgba(color, 0.4);
+    cell.dataset.originalColor = color;
 
     canvas.appendChild(cell);
   });
@@ -1055,6 +1863,8 @@ function render(){
   walls.forEach(w => { if (!w.id) w.id = nextWallId++; });
   walls.forEach(w => drawWall(w,false));
   if(wallPreview) drawWall(wallPreview,true);
+
+  textBoxes.forEach(tb => drawTextBox(tb));
 
   items.forEach(item=>{
     clampItemSizeToCanvas(item);
@@ -1071,29 +1881,40 @@ function render(){
 
     if(item.id===selectedId) el.classList.add("selected");
 
-    const nameInput = document.createElement("input");
-    nameInput.className = "name-input";
-    nameInput.type = "text";
-    nameInput.value = item.name || "";
-    nameInput.placeholder = "Navn på figur";
-    nameInput.addEventListener("mousedown", e => e.stopPropagation());
-    nameInput.addEventListener("click", e => e.stopPropagation());
-    nameInput.addEventListener("focus", () => {
-      if (nameInput.dataset.undoStarted === "1") return;
-      nameInput.dataset.undoStarted = "1";
-      pushUndo();
-    });
-    nameInput.addEventListener("blur", () => {
-      nameInput.dataset.undoStarted = "0";
-    });
-    nameInput.addEventListener("input", e => {
-      item.name = e.target.value;
-    });
-    el.appendChild(nameInput);
+    if (showFigureNames) {
+      const nameInput = document.createElement("input");
+      nameInput.className = "name-input";
+      nameInput.type = "text";
+      nameInput.value = item.name || "";
+      nameInput.placeholder = "Booth Name";
+      resizeNameInput(nameInput, item);
+      nameInput.addEventListener("mousedown", e => e.stopPropagation());
+      nameInput.addEventListener("click", e => e.stopPropagation());
+      nameInput.addEventListener("focus", () => {
+        if (nameInput.dataset.undoStarted === "1") return;
+        nameInput.dataset.undoStarted = "1";
+        pushUndo();
+      });
+      nameInput.addEventListener("blur", () => {
+        nameInput.dataset.undoStarted = "0";
+      });
+      nameInput.addEventListener("input", e => {
+        item.name = e.target.value;
+        resizeNameInput(nameInput, item);
+      });
+      el.appendChild(nameInput);
+    }
 
     const sizeLabel = document.createElement("div");
     sizeLabel.className = "box-size";
-    sizeLabel.textContent = getItemSizeText(item);
+    const widthM = item.w * PX_TO_METER;
+    const heightM = item.h * PX_TO_METER;
+
+    if (widthM < 1 || heightM < 1) {
+      sizeLabel.style.display = "none";
+    } else {
+      sizeLabel.textContent = getItemSizeText(item);
+    }
     el.appendChild(sizeLabel);
 
     el.addEventListener("mousedown",(e)=>{
@@ -1102,6 +1923,7 @@ function render(){
       dragging=true;
       currentItem=item;
       selectedId=item.id;
+      selectedTextId=null;
       selectedWallIds.clear();
       render();
     });
@@ -1114,6 +1936,7 @@ function render(){
       resizing=true;
       currentItem=item;
       selectedId=item.id;
+      selectedTextId=null;
     });
 
     el.appendChild(r);
@@ -1122,7 +1945,7 @@ function render(){
       const colorInput = document.createElement("input");
       colorInput.type = "color";
       colorInput.className = "shape-color-inline";
-      colorInput.title = "Skift figurens farve";
+      colorInput.title = "Change booth color";
       colorInput.value = item.color || "#3b82f6";
       colorInput.addEventListener("mousedown", e => {
         e.stopPropagation();
@@ -1170,8 +1993,52 @@ function render(){
   scheduleAutosave();
 }
 
+updateFigureNamesButton();
+
+function createNewSheet(){
+  document.getElementById("newSheetChoiceDialog").style.display = "flex";
+}
+
+function closeNewSheetChoice(){
+  document.getElementById("newSheetChoiceDialog").style.display = "none";
+}
+
+async function saveBeforeNewSheet(){
+  await saveLayout();
+  createNewSheetConfirmed();
+}
+
+function createNewSheetConfirmed(){
+  closeNewSheetChoice();
+
+  pushUndo();
+
+  currentLayoutId = null;
+  getOrCreateLayoutId();
+
+  items = [];
+  textBoxes = [];
+  walls = [];
+  paintedCells = {};
+  selectedId = null;
+  selectedTextId = null;
+  selectedWallIds.clear();
+
+  nextId = 1;
+  nextTextId = 1;
+  nextWallId = 1;
+
+  render();
+  saveAutosaveNow();
+}
+
 tryRestoreAutosave();
 </script>
+
+
+<footer id="footerCopyright">
+  © Expo Planner - Mathias Andersen - mba@ptdefence.com
+</footer>
 
 </body>
 </html>
