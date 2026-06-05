@@ -2,7 +2,7 @@
 <html lang="da">
 <head>
 <meta charset="UTF-8">
-<title>Expo Planner - V.1.4</title>
+<title>Expo Planner - V.1.6</title>
 <link rel="icon" type="image/x-icon" href="images/Expo_Planner_FAVICON.png">
 
 <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
@@ -143,37 +143,40 @@ button {
 
 input.name-input {
   position: absolute;
-  left: 50%;
-  top: -34px;
-  transform: translateX(-50%);
-  min-width: 40px;
+  min-width: 6px;
   max-width: none;
   border: 1px solid #cbd5e1;
   text-align: center;
   background: rgba(255,255,255,0.95);
-  border-radius: 6px;
-  padding: 2px 4px;
-  box-sizing: border-box;
+  border-radius: 4px;
+  padding: 0 1px;
+  box-sizing: content-box;
   font-size: 12px;
   color: #111827;
   box-shadow: 0 2px 6px rgba(0,0,0,0.12);
   z-index: 3;
+  cursor: move;
+  user-select: none;
+}
+
+input.name-input.editing-label {
+  cursor: text;
+  user-select: text;
+  outline: 2px solid #3b82f6;
+  outline-offset: 1px;
 }
 
 .export-name-text {
   position: absolute;
-  left: 50%;
-  top: -34px;
-  transform: translateX(-50%);
-  min-width: 40px;
+  min-width: 6px;
   max-width: none;
-  min-height: 20px;
+  min-height: 14px;
   text-align: center;
   background: rgba(255,255,255,0.95);
   border: 1px solid #cbd5e1;
-  border-radius: 6px;
-  padding: 2px 4px;
-  box-sizing: border-box;
+  border-radius: 4px;
+  padding: 0 1px;
+  box-sizing: content-box;
   font-size: 12px;
   color: #111827;
   box-shadow: 0 2px 6px rgba(0,0,0,0.12);
@@ -211,12 +214,12 @@ input.name-input {
   border-radius: 5px;
   background: rgba(255,255,255,0.95);
   color: #111827;
-  padding: 2px 4px;
-  font-size: 13px;
+  padding: 1px 2px;
+  font-size: 12px;
   font-family: "Segoe UI", Arial, sans-serif;
   box-sizing: content-box;
-  width: 50px;
-  min-width: 30px;
+  width: auto;
+  min-width: 8px;
   max-width: none;
   white-space: nowrap;
   text-align: center;
@@ -237,8 +240,8 @@ input.name-input {
   border-radius: 5px;
   background: rgba(255,255,255,0.95);
   color: #111827;
-  padding: 2px 4px;
-  font-size: 13px;
+  padding: 1px 2px;
+  font-size: 12px;
   font-family: "Segoe UI", Arial, sans-serif;
   line-height: 1.2;
   white-space: nowrap;
@@ -271,7 +274,7 @@ input.name-input {
 #newSetup label {
   display: flex;
   flex-direction: column;
-  font-size: 13px;
+  font-size: 12px;
 }
 
 #newSheetBtn{
@@ -513,7 +516,7 @@ body.export-force-figure-names .name-wrapper {
 </div>
 
 <div class="toolbar">
-<button onclick="addBox()" title="Add booth. Hold ALT while moving or resizing for 0.5 meter precision.">➕</button>
+<button onclick="addBox()" title="Add booth. Hold ALT for 0.5 meter precision on normal booths. Booths with a 0.5 m side snap in 0.5 m steps automatically.">➕</button>
   <button onclick="addTextBox()" title="Add a free text box to the layout.">📝</button>
     <button onclick="saveLayout()" title="Save layout as a JSON file">💾</button>
   <button onclick="exportPNG()" title="Export the layout as a PNG image">🖼️ PNG</button>
@@ -523,8 +526,6 @@ body.export-force-figure-names .name-wrapper {
   <button id="paintBtn" onclick="togglePaint()" title="Paint grid cells. Hold Shift to erase. Hold Ctrl/Cmd and drag to paint a rectangle.">🎨</button>
   <!-- ✅ NEW -->
   <button id="wallBtn" onclick="toggleWall()" title="Draw walls. Click and drag on the grid.">🧱</button>
-  <button id="namesBtn" class="names-active" onclick="toggleFigureNames()" title="Show or hide booth labels on the grid">🔤 Labels</button>
-
   <label title="Color used for painting grid cells">
     🎨 Grid
     <input type="color" id="paintColorInput" value="#22c55e" onchange="paintColor=this.value" title="Choose grid paint color" style="-webkit-appearance:none;">
@@ -621,6 +622,11 @@ let textDragOffsetY = 0;
 let currentItem = null;
 let dragging = false;
 let resizing = false;
+let draggingFigureLabel = false;
+let currentLabelItem = null;
+let currentLabelInput = null;
+let labelDragOffsetX = 0;
+let labelDragOffsetY = 0;
 
 let undoStack = [];
 let isRestoringState = false;
@@ -691,6 +697,35 @@ const snapByEvent = (v, e) => {
   return Math.floor(v / size) * size;
 };
 
+function snapNearest(v, size){
+  return Math.round(v / size) * size;
+}
+
+function hasHalfMeterSide(item){
+  if (!item) return false;
+
+  const hasHalfRemainder = value => {
+    const remainder = Math.abs(value % GRID_SIZE);
+    return Math.abs(remainder - GRID_SIZE / 2) < 0.01;
+  };
+
+  return hasHalfRemainder(item.w) || hasHalfRemainder(item.h);
+}
+
+function getItemSnapSize(item, e){
+  // Hold ALT for 0.5 m precision on normal booths.
+  // Booths that already have a 0.5 m side always move/resize in 0.5 m steps.
+  return (e && e.altKey) || hasHalfMeterSide(item) ? GRID_SIZE / 2 : GRID_SIZE;
+}
+
+function snapItemPosition(v, item, e){
+  return snapNearest(v, getItemSnapSize(item, e));
+}
+
+function snapItemSize(v, item, e){
+  return snapNearest(v, getItemSnapSize(item, e));
+}
+
 function clonePlain(value){
   return JSON.parse(JSON.stringify(value));
 }
@@ -737,6 +772,8 @@ function restoreSnapshot(snapshot){
   currentItem = null;
   currentTextBox = null;
   draggingTextBox = false;
+  draggingFigureLabel = false;
+  currentLabelItem = null;
   dragging = false;
   resizing = false;
   rotating = false;
@@ -1002,10 +1039,104 @@ function toggleFigureNames(){
 
 function resizeNameInput(input, item){
   const text = input.value || input.placeholder || "";
-  const charWidth = 7.5;
-  const extraPadding = 34;
-  const wantedWidth = Math.ceil(text.length * charWidth + extraPadding);
-  input.style.width = Math.max(item.w, 120, wantedWidth) + "px";
+  const mirror = document.createElement("span");
+  mirror.style.position = "absolute";
+  mirror.style.visibility = "hidden";
+  mirror.style.whiteSpace = "pre";
+  mirror.style.fontFamily = getComputedStyle(input).fontFamily;
+  mirror.style.fontSize = getComputedStyle(input).fontSize;
+  mirror.style.fontWeight = getComputedStyle(input).fontWeight;
+  mirror.textContent = text || " ";
+  document.body.appendChild(mirror);
+
+  const wantedWidth = Math.ceil(mirror.getBoundingClientRect().width) + 1;
+  mirror.remove();
+
+  input.style.width = Math.max(6, wantedWidth) + "px";
+}
+
+function ensureFigureLabelPosition(item, input){
+  if (item.labelX === null || item.labelX === undefined) {
+    const width = input ? input.offsetWidth || parseFloat(input.style.width) || 120 : 120;
+    item.labelX = Math.round((item.w - width) / 2);
+  }
+  if (item.labelY === null || item.labelY === undefined) item.labelY = -34;
+}
+
+function constrainFigureLabelPosition(item, labelX, labelY, input){
+  const maxDistance = GRID_SIZE * 3; // 3 meter fra figurens centrum.
+  const labelWidth = input ? input.offsetWidth || parseFloat(input.style.width) || 120 : 120;
+  const labelHeight = input ? input.offsetHeight || parseFloat(input.style.height) || 24 : 24;
+
+  const itemCenterX = item.x + item.w / 2;
+  const itemCenterY = item.y + item.h / 2;
+  let labelCenterX = item.x + labelX + labelWidth / 2;
+  let labelCenterY = item.y + labelY + labelHeight / 2;
+
+  const dx = labelCenterX - itemCenterX;
+  const dy = labelCenterY - itemCenterY;
+  const distance = Math.sqrt(dx * dx + dy * dy);
+
+  if (distance > maxDistance && distance > 0) {
+    const scale = maxDistance / distance;
+    labelCenterX = itemCenterX + dx * scale;
+    labelCenterY = itemCenterY + dy * scale;
+    labelX = labelCenterX - item.x - labelWidth / 2;
+    labelY = labelCenterY - item.y - labelHeight / 2;
+  }
+
+  return { labelX, labelY };
+}
+
+function applyFigureLabelPosition(input, item){
+  ensureFigureLabelPosition(item, input);
+  const constrained = constrainFigureLabelPosition(item, item.labelX, item.labelY, input);
+  item.labelX = constrained.labelX;
+  item.labelY = constrained.labelY;
+  input.style.left = item.labelX + "px";
+  input.style.top = item.labelY + "px";
+}
+
+function startFigureLabelDrag(e, input, item){
+  if (!input.readOnly) {
+    e.stopPropagation();
+    return;
+  }
+
+  e.preventDefault();
+  e.stopPropagation();
+  pushUndo();
+
+  selectedId = item.id;
+  selectedTextId = null;
+  selectedWallIds.clear();
+  input.focus();
+  draggingFigureLabel = true;
+  currentLabelItem = item;
+  currentLabelInput = input;
+
+  const canvasRect = canvas.getBoundingClientRect();
+  const mouseX = e.clientX - canvasRect.left;
+  const mouseY = e.clientY - canvasRect.top;
+  labelDragOffsetX = mouseX - item.x - (item.labelX || 0);
+  labelDragOffsetY = mouseY - item.y - (item.labelY || 0);
+}
+
+function startEditingFigureLabel(input, item){
+  selectedId = item.id;
+  selectedTextId = null;
+  selectedWallIds.clear();
+  input.readOnly = false;
+  input.classList.add("editing-label");
+  input.style.cursor = "text";
+  input.focus();
+  input.select();
+}
+
+function stopEditingFigureLabel(input){
+  input.readOnly = true;
+  input.classList.remove("editing-label");
+  input.style.cursor = "move";
 }
 
 
@@ -1035,6 +1166,9 @@ function addBox(){
     x: 0, y: 0, w: 80, h: 80,
     angle: 0,
     name: "New Booth",
+    labelX: null,
+    labelY: -34,
+    labelHidden: false,
     color: "#3b82f6"
   };
   items.push(item);
@@ -1058,7 +1192,6 @@ function addTextBox(){
   selectedTextId = textBox.id;
   selectedId = null;
   selectedWallIds.clear();
-  showFigureNames = true;
   render();
   saveAutosaveNow();
 }
@@ -1414,6 +1547,9 @@ canvas.addEventListener("pointerup", (e) => {
   currentTextBox=null;
   draggingTextBox=false;
   currentTextBox=null;
+  draggingFigureLabel=false;
+  currentLabelItem=null;
+  currentLabelInput=null;
   dragging=false;
   resizing=false;
   rotating=false;
@@ -1438,6 +1574,9 @@ canvas.addEventListener("pointercancel", (e) => {
   currentTextBox=null;
   draggingTextBox=false;
   currentTextBox=null;
+  draggingFigureLabel=false;
+  currentLabelItem=null;
+  currentLabelInput=null;
   dragging=false;
   resizing=false;
   rotating=false;
@@ -1472,6 +1611,9 @@ document.addEventListener("mouseup", () => {
   currentTextBox=null;
   draggingTextBox=false;
   currentTextBox=null;
+  draggingFigureLabel=false;
+  currentLabelItem=null;
+  currentLabelInput=null;
   dragging=false;
   resizing=false;
   rotating=false;
@@ -1507,6 +1649,35 @@ document.addEventListener("keydown", e => {
     return;
   }
 
+  if (!isTextField && e.key.toLowerCase() === "l" && selectedId !== null) {
+    const item = items.find(i => i.id === selectedId);
+    if (item && item.labelHidden) {
+      e.preventDefault();
+      pushUndo();
+      item.labelHidden = false;
+      if (!item.name) item.name = "New Booth";
+      render();
+      saveAutosaveNow();
+    }
+    return;
+  }
+
+  const selectedLabelInput = document.activeElement && document.activeElement.classList && document.activeElement.classList.contains("name-input")
+    ? document.activeElement
+    : null;
+
+  if (selectedLabelInput && selectedLabelInput.readOnly && (e.key === "Delete" || e.key === "Backspace")) {
+    const item = items.find(i => i.id === selectedId);
+    if (item) {
+      e.preventDefault();
+      pushUndo();
+      item.labelHidden = true;
+      render();
+      saveAutosaveNow();
+    }
+    return;
+  }
+
   if (isTextField) return;
 
   if (e.key === "Delete" || e.key === "Backspace") {
@@ -1533,10 +1704,20 @@ document.addEventListener("keydown", e => {
 });
 
 document.addEventListener("mousemove", e=>{
-  if(!currentItem && !currentTextBox) return;
+  if(!currentItem && !currentTextBox && !currentLabelItem) return;
   const r = canvas.getBoundingClientRect();
   const x = e.clientX - r.left;
   const y = e.clientY - r.top;
+
+  if(draggingFigureLabel && currentLabelItem){
+    const nextLabelX = x - currentLabelItem.x - labelDragOffsetX;
+    const nextLabelY = y - currentLabelItem.y - labelDragOffsetY;
+    const constrained = constrainFigureLabelPosition(currentLabelItem, nextLabelX, nextLabelY, currentLabelInput);
+    currentLabelItem.labelX = constrained.labelX;
+    currentLabelItem.labelY = constrained.labelY;
+    render();
+    return;
+  }
 
   if(draggingTextBox && currentTextBox){
     currentTextBox.x = Math.max(0, Math.min(x - textDragOffsetX, canvas.offsetWidth - 20));
@@ -1546,16 +1727,16 @@ document.addEventListener("mousemove", e=>{
   }
 
   if(dragging){
-    currentItem.x = snapByEvent(x - currentItem.w/2, e);
-    currentItem.y = snapByEvent(y - currentItem.h/2, e);
+    currentItem.x = snapItemPosition(x - currentItem.w/2, currentItem, e);
+    currentItem.y = snapItemPosition(y - currentItem.h/2, currentItem, e);
     clampItemToCanvas(currentItem);
     render();
   }
 
   if(resizing){
-    const minSize = e.altKey ? GRID_SIZE / 2 : GRID_SIZE;
-    currentItem.w = Math.max(minSize, snapByEvent(x - currentItem.x, e));
-    currentItem.h = Math.max(minSize, snapByEvent(y - currentItem.y, e));
+    const minSize = getItemSnapSize(currentItem, e);
+    currentItem.w = Math.max(minSize, snapItemSize(x - currentItem.x, currentItem, e));
+    currentItem.h = Math.max(minSize, snapItemSize(y - currentItem.y, currentItem, e));
     clampItemSizeToCanvas(currentItem);
     render();
   }
@@ -1593,12 +1774,8 @@ async function exportPNG(){
   // Save the selected state so the export is clean without selections/handles.
   const savedSelectedId = selectedId;
   const savedSelectedWallIds = new Set(selectedWallIds);
-  const savedShowFigureNames = showFigureNames;
-
   selectedId = null;
   selectedWallIds.clear();
-  showFigureNames = true;
-  updateFigureNamesButton();
   render();
 
   try {
@@ -1614,26 +1791,13 @@ async function exportPNG(){
       scale: 2,
       useCORS: true,
       onclone: (clonedDocument) => {
-        clonedDocument.body.classList.add("export-force-figure-names");
-
-        clonedDocument.querySelectorAll(".name-input").forEach(input => {
-          input.style.display = "block";
-          input.style.visibility = "visible";
-          input.style.opacity = "1";
-          const parent = input.closest(".figure-name, .box-name, .name-wrapper");
-          if (parent) {
-            parent.style.display = "block";
-            parent.style.visibility = "visible";
-            parent.style.opacity = "1";
-          }
-        });
-
         // html2canvas kan beskære tekst inde i input-felter.
         // Derfor erstatter vi kun i eksport-kopien inputfelterne med almindelige divs.
         clonedDocument.querySelectorAll(".name-input").forEach(input => {
           const text = clonedDocument.createElement("div");
           text.className = "export-name-text";
           text.textContent = input.value || input.getAttribute("value") || "";
+          text.style.cssText = input.style.cssText;
           input.replaceWith(text);
         });
 
@@ -1663,8 +1827,6 @@ clonedDocument.querySelectorAll(".text-box-input").forEach(input => {
   } finally {
     selectedId = savedSelectedId;
     selectedWallIds = savedSelectedWallIds;
-    showFigureNames = savedShowFigureNames;
-    updateFigureNamesButton();
     render();
   }
 }
@@ -1707,7 +1869,11 @@ function drawWall(w, preview){
 
 function updateTextInputWidth(input){
   const text = input.value || input.placeholder || "";
-  input.style.width = Math.max(30, (text.length + 1) * 7) + "px";
+  const measure = document.createElement("canvas");
+  const ctx = measure.getContext("2d");
+  ctx.font = "13px Segoe UI, Arial, sans-serif";
+  const textWidth = Math.ceil(ctx.measureText(text).width);
+  input.style.width = Math.max(8, textWidth + 4) + "px";
 }
 
 function beginTextBoxDrag(e, tb){
@@ -1878,29 +2044,57 @@ function render(){
     el.style.height=item.h+"px";
     el.style.background=item.color;
     el.style.transform=`rotate(${item.angle}deg)`;
+    el.title = item.labelHidden ? "Label er skjult. Vælg figuren og tryk L for at vise label igen." : "Drag to move booth.";
 
     if(item.id===selectedId) el.classList.add("selected");
 
-    if (showFigureNames) {
+    if (showFigureNames && !item.labelHidden) {
       const nameInput = document.createElement("input");
       nameInput.className = "name-input";
       nameInput.type = "text";
       nameInput.value = item.name || "";
       nameInput.placeholder = "Booth Name";
+      nameInput.readOnly = true;
       resizeNameInput(nameInput, item);
-      nameInput.addEventListener("mousedown", e => e.stopPropagation());
+      applyFigureLabelPosition(nameInput, item);
+
+      nameInput.title = "Drag to move label. Double-click to edit.";
+      nameInput.addEventListener("mousedown", e => startFigureLabelDrag(e, nameInput, item));
       nameInput.addEventListener("click", e => e.stopPropagation());
+      nameInput.addEventListener("dblclick", e => {
+        e.preventDefault();
+        e.stopPropagation();
+        draggingFigureLabel = false;
+        currentLabelItem = null;
+        currentLabelInput = null;
+        startEditingFigureLabel(nameInput, item);
+      });
       nameInput.addEventListener("focus", () => {
+        if (nameInput.readOnly) return;
         if (nameInput.dataset.undoStarted === "1") return;
         nameInput.dataset.undoStarted = "1";
         pushUndo();
       });
       nameInput.addEventListener("blur", () => {
         nameInput.dataset.undoStarted = "0";
+        stopEditingFigureLabel(nameInput);
+      });
+      nameInput.addEventListener("keydown", e => {
+        if (nameInput.readOnly && e.key === "Enter") {
+          e.preventDefault();
+          startEditingFigureLabel(nameInput, item);
+          return;
+        }
+        if (!nameInput.readOnly && (e.key === "Enter" || e.key === "Escape")) {
+          e.preventDefault();
+          nameInput.blur();
+        }
       });
       nameInput.addEventListener("input", e => {
         item.name = e.target.value;
         resizeNameInput(nameInput, item);
+        applyFigureLabelPosition(nameInput, item);
+        scheduleAutosave();
       });
       el.appendChild(nameInput);
     }
