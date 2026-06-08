@@ -520,6 +520,7 @@ body.export-force-figure-names .name-wrapper {
   <button onclick="addTextBox()" title="Add a free text box to the layout.">📝</button>
     <button onclick="saveLayout()" title="Save layout as a JSON file">💾</button>
   <button onclick="exportPNG()" title="Export the layout as a PNG image">🖼️ PNG</button>
+  <button id="namesBtn" onclick="toggleFigureNames()" title="Show/hide figure labels">🔤 Labels</button>
   <button onclick="fileInput.click()" title="Open a saved layout file">📂</button>
   
 
@@ -1028,7 +1029,7 @@ function toggleWall(){
 function updateFigureNamesButton(){
   if (!window.namesBtn) return;
   namesBtn.classList.toggle("names-active", showFigureNames);
-  namesBtn.textContent = showFigureNames ? "🔤 Labels" : "🔤 Labels skjult";
+  namesBtn.textContent = showFigureNames ? "🔤 Labels" : "🔤 Labels hidden";
 }
 
 function toggleFigureNames(){
