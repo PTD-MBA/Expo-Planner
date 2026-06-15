@@ -252,13 +252,16 @@ input.name-input.editing-label {
 #setup {
   position: fixed;
   inset: 0;
+  z-index: 3200;
   background: rgba(0,0,0,0.6);
-  display: flex;
+  display: none;
   justify-content: center;
   align-items: center;
 }
 
 #setupBox {
+  position: relative;
+  z-index: 3201;
   background: white;
   padding: 20px;
   border-radius: 12px;
@@ -930,13 +933,15 @@ function describeAutosave(layout){
 
 function tryRestoreAutosave(){
   pendingAutosaveLayout = getLatestAutosave();
-  if (!pendingAutosaveLayout) return;
+  if (!pendingAutosaveLayout) return false;
 
+  setup.style.display = "none";
   const dialog = document.getElementById("autosaveDialog");
   const details = document.getElementById("autosaveDetails");
 
   if (details) details.innerHTML = describeAutosave(pendingAutosaveLayout);
   if (dialog) dialog.style.display = "flex";
+  return true;
 }
 
 function restoreAutosaveFromDialog(){
@@ -949,6 +954,8 @@ function restoreAutosaveFromDialog(){
 function startFreshFromAutosaveDialog(){
   document.getElementById("autosaveDialog").style.display = "none";
   pendingAutosaveLayout = null;
+  setup.style.display = "flex";
+  document.getElementById("newSetup").style.display = "none";
 }
 
 function deleteAutosaveFromDialog(){
@@ -959,6 +966,11 @@ function deleteAutosaveFromDialog(){
 
   document.getElementById("autosaveDialog").style.display = "none";
   pendingAutosaveLayout = null;
+
+  // Når autosaven slettes, skal brugeren sendes videre til normal opstart,
+  // så det er muligt at oprette et nyt grid eller åbne et layout.
+  setup.style.display = "flex";
+  document.getElementById("newSetup").style.display = "none";
 }
 
 function loadLayoutFile(file){
@@ -2203,14 +2215,7 @@ async function saveBeforeNewSheet(){
   createNewSheetConfirmed();
 }
 
-function createNewSheetConfirmed(){
-  closeNewSheetChoice();
-
-  pushUndo();
-
-  currentLayoutId = null;
-  getOrCreateLayoutId();
-
+function resetLayoutContent(){
   items = [];
   textBoxes = [];
   walls = [];
@@ -2222,12 +2227,33 @@ function createNewSheetConfirmed(){
   nextId = 1;
   nextTextId = 1;
   nextWallId = 1;
-
-  render();
-  saveAutosaveNow();
 }
 
-tryRestoreAutosave();
+function openNewLayoutSizeSetup(){
+  setup.style.display = "flex";
+  toolbar.style.display = "none";
+  document.getElementById("newSheetBtn").style.display = "none";
+  document.getElementById("newSetup").style.display = "flex";
+
+  widthInput.value = canvasWidthM || 10;
+  heightInput.value = canvasHeightM || 10;
+}
+
+function createNewSheetConfirmed(){
+  closeNewSheetChoice();
+
+  pushUndo();
+
+  currentLayoutId = null;
+  getOrCreateLayoutId();
+  resetLayoutContent();
+
+  openNewLayoutSizeSetup();
+}
+
+if (!tryRestoreAutosave()) {
+  setup.style.display = "flex";
+}
 </script>
 
 
