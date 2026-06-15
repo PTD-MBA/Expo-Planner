@@ -1,0 +1,2239 @@
+<!DOCTYPE html>
+<html lang="da">
+<head>
+<meta charset="UTF-8">
+<title>Expo Planner - V.1.6</title>
+<link rel="icon" type="image/x-icon" href="images/Expo_Planner_FAVICON.png">
+
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+
+<style>
+body {
+  margin: 0;
+  font-family: "Segoe UI", Arial, sans-serif;
+  background: #f1f5f9;
+}
+
+.toolbar {
+  display: none;
+  position: fixed;
+  top: 38px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2400;
+  gap: 10px;
+  padding: 10px 15px;
+  border-radius: 12px;
+  background: rgba(255,255,255,0.85);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 8px 20px rgba(0,0,0,0.1);
+}
+
+button {
+  border: none;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: #3b82f6;
+  color: white;
+  cursor: pointer;
+}
+
+.paint-active {
+  outline: 2px solid #22c55e;
+}
+
+.wall-active {
+  outline: 2px solid #111;
+}
+
+.names-active {
+  outline: 2px solid #f59e0b;
+}
+
+#canvas {
+  position: relative;
+  margin: 130px auto 10px auto;
+  border-radius: 16px;
+  background: white;
+  box-shadow: 0 20px 40px rgba(0,0,0,0.08);
+  background-size: 40px 40px;
+  background-image:
+    linear-gradient(to right,#e5e7eb 1px,transparent 1px),
+    linear-gradient(to bottom,#e5e7eb 1px,transparent 1px);
+}
+
+.canvas-paint { cursor: crosshair; }
+
+.canvas-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(34,197,94,0.08);
+  pointer-events: none;
+}
+
+.paint-rect-preview {
+  position: absolute;
+  box-sizing: border-box;
+  border: 2px dashed #111827;
+  background: rgba(59,130,246,0.18);
+  pointer-events: none;
+  z-index: 5;
+}
+
+.paint-rect-preview.erase {
+  background: rgba(239,68,68,0.16);
+  border-color: #ef4444;
+}
+
+/* ✅ NEW */
+.wall {
+  position:absolute;
+  background:black;
+  pointer-events:auto;
+  cursor: pointer;
+}
+
+.wall.selected-wall {
+  background: #ef4444;
+  outline: 3px solid #fca5a5;
+}
+
+.box {
+  position: absolute;
+  border-radius: 10px;
+  color: white;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
+  box-sizing: border-box;
+  cursor: move;
+  font-size: 12px;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+  transform-origin: center;
+}
+
+.selected { outline: 3px solid red; }
+
+.resizer {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: white;
+  right: -4px;
+  bottom: -4px;
+  border: 2px solid black;
+  cursor: se-resize;
+}
+
+.rotator {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: yellow;
+  border: 2px solid black;
+  top: -20px;
+  left: 50%;
+  transform: translateX(-50%);
+  cursor: grab;
+}
+
+input.name-input {
+  position: absolute;
+  min-width: 6px;
+  max-width: none;
+  border: 1px solid #cbd5e1;
+  text-align: center;
+  background: rgba(255,255,255,0.95);
+  border-radius: 4px;
+  padding: 0 1px;
+  box-sizing: content-box;
+  font-size: 12px;
+  color: #111827;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.12);
+  z-index: 3;
+  cursor: move;
+  user-select: none;
+}
+
+input.name-input.editing-label {
+  cursor: text;
+  user-select: text;
+  outline: 2px solid #3b82f6;
+  outline-offset: 1px;
+}
+
+.export-name-text {
+  position: absolute;
+  min-width: 6px;
+  max-width: none;
+  min-height: 14px;
+  text-align: center;
+  background: rgba(255,255,255,0.95);
+  border: 1px solid #cbd5e1;
+  border-radius: 4px;
+  padding: 0 1px;
+  box-sizing: content-box;
+  font-size: 12px;
+  color: #111827;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.12);
+  overflow: visible;
+  white-space: nowrap;
+  z-index: 3;
+}
+
+.box-size {
+  margin-top: 5px;
+  padding: 2px 5px;
+  border-radius: 5px;
+  background: rgba(0,0,0,0.25);
+  color: white;
+  font-weight: 600;
+  font-size: 11px;
+  line-height: 1.2;
+}
+
+.text-box {
+  position: absolute;
+  z-index: 20;
+  cursor: move;
+  transform-origin: center;
+}
+
+.text-box.selected-text {
+  outline: 2px solid #ef4444;
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+.text-box-input {
+  border: 1px solid #cbd5e1;
+  border-radius: 5px;
+  background: rgba(255,255,255,0.95);
+  color: #111827;
+  padding: 1px 2px;
+  font-size: 12px;
+  font-family: "Segoe UI", Arial, sans-serif;
+  box-sizing: content-box;
+  width: auto;
+  min-width: 8px;
+  max-width: none;
+  white-space: nowrap;
+  text-align: center;
+  cursor: move;
+  user-select: none;
+}
+
+.text-box-input.editing {
+  cursor: text;
+  user-select: text;
+  outline: 2px solid #3b82f6;
+  outline-offset: 1px;
+}
+
+.export-text-box-text {
+  display: inline-block;
+  border: 1px solid #cbd5e1;
+  border-radius: 5px;
+  background: rgba(255,255,255,0.95);
+  color: #111827;
+  padding: 1px 2px;
+  font-size: 12px;
+  font-family: "Segoe UI", Arial, sans-serif;
+  line-height: 1.2;
+  white-space: nowrap;
+  text-align: center;
+  box-sizing: content-box;
+}
+
+#setup {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+#setupBox {
+  background: white;
+  padding: 20px;
+  border-radius: 12px;
+  width: 260px;
+  text-align: center;
+}
+
+#newSetup {
+  flex-direction: column;
+  gap: 10px;
+}
+
+#newSetup label {
+  display: flex;
+  flex-direction: column;
+  font-size: 12px;
+}
+
+#newSheetBtn{
+  display:none;
+  position:fixed;
+  top:20px;
+  right:20px;
+  z-index:2000;
+  border:none;
+  padding:10px 14px;
+  border-radius:10px;
+  background:#16a34a;
+  color:white;
+  cursor:pointer;
+  box-shadow:0 4px 10px rgba(0,0,0,0.15);
+}
+
+
+#autosaveStatus{
+  position:fixed;
+  top:2px;
+  left:50%;
+  transform:translateX(-50%);
+  z-index:2600;
+  padding:5px 8px;
+  border-radius:8px;
+  background:rgba(15,23,42,0.08);
+  color:#334155;
+  font-size:12px;
+  white-space:nowrap;
+}
+
+#autosaveDialog{
+  position:fixed;
+  inset:0;
+  z-index:3000;
+  background:rgba(15,23,42,0.55);
+  display:none;
+  align-items:center;
+  justify-content:center;
+}
+
+#autosaveDialogBox{
+  width:340px;
+  background:white;
+  border-radius:16px;
+  padding:20px;
+  box-shadow:0 20px 50px rgba(0,0,0,0.25);
+  font-family:"Segoe UI", Arial, sans-serif;
+}
+
+#autosaveDialogBox h3{
+  margin:0 0 10px;
+}
+
+#autosaveDialogBox p{
+  margin:8px 0;
+  color:#475569;
+  font-size:14px;
+}
+
+#autosaveDetails{
+  margin:12px 0;
+  padding:10px;
+  border-radius:10px;
+  background:#f1f5f9;
+  color:#334155;
+  font-size:13px;
+  line-height:1.5;
+}
+
+.autosave-actions{
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+  margin-top:14px;
+}
+
+.autosave-actions button{
+  flex:1;
+  min-width:100px;
+}
+
+button.secondary{
+  background:#64748b;
+}
+
+button.danger{
+  background:#ef4444;
+}
+
+#newSheetChoiceDialog{
+  position:fixed;
+  inset:0;
+  z-index:3100;
+  background:rgba(15,23,42,0.55);
+  display:none;
+  align-items:center;
+  justify-content:center;
+}
+
+#newSheetChoiceBox{
+  width:360px;
+  background:white;
+  border-radius:16px;
+  padding:20px;
+  box-shadow:0 20px 50px rgba(0,0,0,0.25);
+}
+
+#newSheetChoiceBox h3{
+  margin:0 0 10px;
+}
+
+#newSheetChoiceBox p{
+  margin:8px 0 14px;
+  color:#475569;
+  font-size:14px;
+}
+
+.new-sheet-actions{
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+}
+
+.new-sheet-actions button{
+  flex:1;
+  min-width:105px;
+}
+
+
+body.export-force-figure-names .name-input,
+body.export-force-figure-names .figure-name,
+body.export-force-figure-names .box-name,
+body.export-force-figure-names .name-wrapper {
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+
+
+.painted-cell {
+  position: absolute;
+  pointer-events: none;
+}
+
+
+#paintColorInput::-webkit-color-swatch-wrapper{
+  padding:0;
+}
+
+
+
+
+
+
+#setupLogo{
+  width: 230px;
+  max-width: 90%;
+  height: auto;
+  display: block;
+  margin: 0 auto 16px;
+}
+
+
+
+
+#expoLogo{
+  position:fixed;
+  top:8px;
+  left:10px;
+  z-index:2200;
+  pointer-events:none;
+}
+
+#expoLogo img{
+  height:95px;
+  width:auto;
+  opacity:0.95;
+}
+
+
+
+
+
+
+
+
+#footerCopyright{
+  width:100%;
+  text-align:center;
+  margin:0;
+  padding:0 0 8px 0;
+  color:#64748b;
+  font-size:12px;
+  font-family:"Segoe UI", Arial, sans-serif;
+}
+
+
+.export-copyright-watermark{
+  position:absolute;
+  right:12px;
+  bottom:12px;
+  font-size:12px;
+  color:#64748b;
+  background:rgba(255,255,255,0.85);
+  border:1px solid rgba(15,23,42,0.08);
+  border-radius:6px;
+  padding:4px 8px;
+  font-family:"Segoe UI", Arial, sans-serif;
+  z-index:9999;
+}
+
+</style>
+</head>
+
+<body>
+
+<div id="expoLogo">
+  <img src="images/Expo_Planner_logo.png" alt="Expo Planner Logo">
+</div>
+
+
+<div id="setup">
+  <div id="setupBox">
+    
+    <img id="setupLogo" src="images/Expo_Planner_logo.png" alt="Expo Planner Logo">
+
+
+    <button onclick="showNew()" title="Create a new layout from scratch">🆕 Create New</button>
+    <button onclick="fileInput.click()" title="Open a previously saved layout file">📂 Open Layout</button>
+
+    <div id="newSetup" style="display:none">
+      <label>Width (m)<input id="widthInput" type="number" value=""></label>
+      <label>Height (m)<input id="heightInput" type="number" value=""></label>
+      <button onclick="initCanvas()" title="Start with the selected layout size">Start</button>
+    </div>
+  </div>
+</div>
+
+<div class="toolbar">
+<button onclick="addBox()" title="Add booth. Hold ALT for 0.5 meter precision on normal booths. Booths with a 0.5 m side snap in 0.5 m steps automatically.">➕</button>
+  <button onclick="addTextBox()" title="Add a free text box to the layout.">📝</button>
+    <button onclick="saveLayout()" title="Save layout as a JSON file">💾</button>
+  <button onclick="exportPNG()" title="Export the layout as a PNG image">🖼️ PNG</button>
+  <button id="namesBtn" onclick="toggleFigureNames()" title="Show/hide figure labels">🔤 Labels</button>
+  <button onclick="fileInput.click()" title="Open a saved layout file">📂</button>
+  
+
+  <button id="paintBtn" onclick="togglePaint()" title="Paint grid cells. Hold Shift to erase. Hold Ctrl/Cmd and drag to paint a rectangle.">🎨</button>
+  <!-- ✅ NEW -->
+  <button id="wallBtn" onclick="toggleWall()" title="Draw walls. Click and drag on the grid.">🧱</button>
+  <label title="Color used for painting grid cells">
+    🎨 Grid
+    <input type="color" id="paintColorInput" value="#22c55e" onchange="paintColor=this.value" title="Choose grid paint color" style="-webkit-appearance:none;">
+    <button type="button" id="gridPipetteBtn" onclick="toggleGridPipette()" title="Eyedropper: click a painted grid cell to copy its original color">🧪</button>
+  </label>
+
+
+  <input type="file" id="fileInput" hidden>
+</div>
+
+
+
+
+<div id="autosaveStatus" title="Autosave status">Autosave: ikke gemt</div>
+
+<div id="canvas"></div>
+
+<button id="newSheetBtn" onclick="createNewSheet()" title="Create a new empty layout without reloading the page">📄 New Layout</button>
+
+<div id="autosaveDialog">
+  <div id="autosaveDialogBox">
+    <h3>Restore Previous Planner?</h3>
+    <p>An autosave from your previous session was found.</p>
+    <div id="autosaveDetails"></div>
+    <div class="autosave-actions">
+      <button onclick="restoreAutosaveFromDialog()">Restore Autosave</button>
+      <button class="secondary" onclick="startFreshFromAutosaveDialog()">Start New</button>
+      <button class="danger" onclick="deleteAutosaveFromDialog()">Delete Autosave</button>
+    </div>
+  </div>
+</div>
+
+<div id="newSheetChoiceDialog">
+  <div id="newSheetChoiceBox">
+    <h3>Create New Layout?</h3>
+    <p>Would you like to save the current layout first?</p>
+    <div class="new-sheet-actions">
+      <button onclick="saveBeforeNewSheet()">Save First</button>
+      <button class="danger" onclick="createNewSheetConfirmed()">Continue Without Saving</button>
+      <button class="secondary" onclick="closeNewSheetChoice()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+
+
+<script>
+const GRID_SIZE = 40;
+const PX_TO_METER = 1/40;
+
+const canvas = document.getElementById("canvas");
+const fileInput = document.getElementById("fileInput");
+const setup = document.getElementById("setup");
+const toolbar = document.querySelector(".toolbar");
+const shapeColorInput = document.getElementById("shapeColorInput");
+const paintColorInput = document.getElementById("paintColorInput");
+
+let paintMode = false;
+let pickGridColorMode = false;
+let showFigureNames = true;
+let paintColor = "#22c55e";
+let paintedCells = {};
+let isPainting = false;
+
+/* ✅ NEW WALL STATE */
+let walls = [];
+let selectedWallIds = new Set();
+let nextWallId = 1;
+let wallMode = false;
+let drawingWall = false;
+let wallStart = null;
+let wallPreview = null;
+
+let rotating = false;
+let rotationStartMouseAngle = 0;
+let rotationStartItemAngle = 0;
+
+let canvasWidthM = 47;
+let canvasHeightM = 17;
+
+let items = [];
+let selectedId = null;
+let nextId = 1;
+let copiedItem = null;
+
+let textBoxes = [];
+let selectedTextId = null;
+let nextTextId = 1;
+let currentTextBox = null;
+let draggingTextBox = false;
+let textDragOffsetX = 0;
+let textDragOffsetY = 0;
+
+let currentItem = null;
+let dragging = false;
+let resizing = false;
+let draggingFigureLabel = false;
+let currentLabelItem = null;
+let currentLabelInput = null;
+let labelDragOffsetX = 0;
+let labelDragOffsetY = 0;
+
+let undoStack = [];
+let isRestoringState = false;
+let autosaveTimer = null;
+let lastAutosaveAt = null;
+const AUTOSAVE_INDEX_KEY = "expoPlannerAutosaveIndexV2";
+let currentLayoutId = null;
+let pendingAutosaveLayout = null;
+
+function getOrCreateLayoutId(){
+  if (!currentLayoutId) {
+    currentLayoutId = "layout-" + Date.now() + "-" + Math.random().toString(36).slice(2, 8);
+  }
+  return currentLayoutId;
+}
+
+function getAutosaveKey(layoutId){
+  return `expoPlannerAutosaveV2:${layoutId}`;
+}
+
+function readAutosaveIndex(){
+  try {
+    return JSON.parse(localStorage.getItem(AUTOSAVE_INDEX_KEY) || "[]");
+  } catch {
+    return [];
+  }
+}
+
+function writeAutosaveIndex(index){
+  localStorage.setItem(AUTOSAVE_INDEX_KEY, JSON.stringify(index));
+}
+
+function upsertAutosaveIndexEntry(layout){
+  const layoutId = layout.layoutId;
+  let index = readAutosaveIndex().filter(entry => entry.layoutId !== layoutId);
+
+  index.unshift({
+    layoutId,
+    savedAt: layout.savedAt,
+    canvasWidthM: layout.state?.canvasWidthM,
+    canvasHeightM: layout.state?.canvasHeightM,
+    itemCount: layout.state?.items?.length || 0,
+    textBoxCount: layout.state?.textBoxes?.length || 0,
+    wallCount: layout.state?.walls?.length || 0
+  });
+
+  index = index.slice(0, 10);
+  writeAutosaveIndex(index);
+}
+
+function updateAutosaveStatus(text){
+  const status = document.getElementById("autosaveStatus");
+  if (status) status.textContent = text;
+}
+
+function formatAutosaveTime(date){
+  return date.toLocaleTimeString("da-DK", { hour:"2-digit", minute:"2-digit" });
+}
+let activePaintKeys = new Set();
+let paintingRect = false;
+let paintRectStart = null;
+let paintRectPreview = null;
+let paintRectErase = false;
+
+const snap = v => Math.floor(v / GRID_SIZE) * GRID_SIZE;
+const snapByEvent = (v, e) => {
+  const size = e && e.altKey ? GRID_SIZE / 2 : GRID_SIZE;
+  return Math.floor(v / size) * size;
+};
+
+function snapNearest(v, size){
+  return Math.round(v / size) * size;
+}
+
+function hasHalfMeterSide(item){
+  if (!item) return false;
+
+  const hasHalfRemainder = value => {
+    const remainder = Math.abs(value % GRID_SIZE);
+    return Math.abs(remainder - GRID_SIZE / 2) < 0.01;
+  };
+
+  return hasHalfRemainder(item.w) || hasHalfRemainder(item.h);
+}
+
+function getItemSnapSize(item, e){
+  // Hold ALT for 0.5 m precision on normal booths.
+  // Booths that already have a 0.5 m side always move/resize in 0.5 m steps.
+  return (e && e.altKey) || hasHalfMeterSide(item) ? GRID_SIZE / 2 : GRID_SIZE;
+}
+
+function snapItemPosition(v, item, e){
+  return snapNearest(v, getItemSnapSize(item, e));
+}
+
+function snapItemSize(v, item, e){
+  return snapNearest(v, getItemSnapSize(item, e));
+}
+
+function clonePlain(value){
+  return JSON.parse(JSON.stringify(value));
+}
+
+function createSnapshot(){
+  return {
+    items: clonePlain(items),
+    textBoxes: clonePlain(textBoxes),
+    walls: clonePlain(walls),
+    paintedCells: clonePlain(paintedCells),
+    selectedId,
+    selectedTextId,
+    selectedWallIds: Array.from(selectedWallIds),
+    nextId,
+    nextTextId,
+    nextWallId,
+    showFigureNames,
+    canvasWidthM,
+    canvasHeightM
+  };
+}
+
+function restoreSnapshot(snapshot){
+  isRestoringState = true;
+
+  items = clonePlain(snapshot.items || []);
+  textBoxes = clonePlain(snapshot.textBoxes || []);
+  walls = clonePlain(snapshot.walls || []);
+  paintedCells = clonePlain(snapshot.paintedCells || {});
+  selectedId = snapshot.selectedId ?? null;
+  selectedTextId = snapshot.selectedTextId ?? null;
+  selectedWallIds = new Set(snapshot.selectedWallIds || []);
+  nextId = snapshot.nextId || 1;
+  nextTextId = snapshot.nextTextId || 1;
+  nextWallId = snapshot.nextWallId || 1;
+  showFigureNames = snapshot.showFigureNames !== false;
+  canvasWidthM = snapshot.canvasWidthM || canvasWidthM;
+  updateFigureNamesButton();
+  canvasHeightM = snapshot.canvasHeightM || canvasHeightM;
+
+  drawingWall = false;
+  wallStart = null;
+  wallPreview = null;
+  currentItem = null;
+  currentTextBox = null;
+  draggingTextBox = false;
+  draggingFigureLabel = false;
+  currentLabelItem = null;
+  dragging = false;
+  resizing = false;
+  rotating = false;
+  isPainting = false;
+  paintingRect = false;
+  paintRectStart = null;
+  paintRectPreview = null;
+  paintRectErase = false;
+  activePaintKeys.clear();
+
+  updateCanvasSize();
+  render();
+  isRestoringState = false;
+}
+
+function pushUndo(){
+  if (isRestoringState) return;
+  undoStack.push(createSnapshot());
+
+  // Hold historikken begrænset, så siden ikke bruger for meget hukommelse.
+  if (undoStack.length > 100) undoStack.shift();
+}
+
+function undoLastAction(){
+  const snapshot = undoStack.pop();
+  if (!snapshot) return;
+  restoreSnapshot(snapshot);
+}
+
+
+
+
+function getLayoutState(){
+  return {
+    app: "Expo Planner",
+    version: "1.5",
+    layoutId: getOrCreateLayoutId(),
+    savedAt: new Date().toISOString(),
+    state: createSnapshot()
+  };
+}
+
+function applyLayoutState(layout){
+  const snapshot = layout && layout.state ? layout.state : layout;
+  if (!snapshot) throw new Error("The layout file is missing data.");
+
+  currentLayoutId = layout && layout.layoutId ? layout.layoutId : "layout-" + Date.now() + "-" + Math.random().toString(36).slice(2, 8);
+
+  restoreSnapshot(snapshot);
+  setup.style.display = "none";
+  toolbar.style.display = "flex";
+    document.getElementById("newSheetBtn").style.display = "block";
+  saveAutosaveNow();
+}
+
+function downloadTextFile(filename, text){
+  const blob = new Blob([text], { type: "application/json;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.download = filename;
+  link.href = url;
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+async function saveLayout(){
+  saveAutosaveNow();
+
+  const now = new Date();
+  const stamp = now.toISOString().slice(0,19).replace(/[:T]/g,"-");
+  const filename = `expo-planner-${stamp}.json`;
+  const content = JSON.stringify(getLayoutState(), null, 2);
+
+  try {
+    if (window.showSaveFilePicker) {
+      const handle = await window.showSaveFilePicker({
+        suggestedName: filename,
+        types: [{
+          description: "Expo Planner Layout",
+          accept: { "application/json": [".json"] }
+        }]
+      });
+
+      const writable = await handle.createWritable();
+      await writable.write(content);
+      await writable.close();
+      updateAutosaveStatus("Gemt som fil kl. " + formatAutosaveTime(new Date()));
+    } else {
+      downloadTextFile(filename, content);
+      updateAutosaveStatus("Downloadet fil kl. " + formatAutosaveTime(new Date()));
+    }
+  } catch (err) {
+    if (err && err.name !== "AbortError") {
+      console.error(err);
+      downloadTextFile(filename, content);
+    }
+  }
+}
+
+function saveAutosaveNow(){
+  try {
+    updateAutosaveStatus("Saving autosave...");
+
+    const layout = getLayoutState();
+    localStorage.setItem(getAutosaveKey(layout.layoutId), JSON.stringify(layout));
+    upsertAutosaveIndexEntry(layout);
+
+    lastAutosaveAt = new Date();
+    updateAutosaveStatus("Autosaved at " + formatAutosaveTime(lastAutosaveAt));
+  } catch (err) {
+    updateAutosaveStatus("Autosave failed");
+    console.warn("Autosave could not be saved", err);
+  }
+}
+
+function scheduleAutosave(){
+  if (isRestoringState) return;
+  updateAutosaveStatus("Unsaved changes");
+  clearTimeout(autosaveTimer);
+  autosaveTimer = setTimeout(saveAutosaveNow, 400);
+}
+
+function getLatestAutosave(){
+  const index = readAutosaveIndex();
+  if (!index.length) return null;
+
+  for (const entry of index) {
+    try {
+      const raw = localStorage.getItem(getAutosaveKey(entry.layoutId));
+      if (!raw) continue;
+      return JSON.parse(raw);
+    } catch (err) {
+      console.warn("Autosave could not be read", err);
+    }
+  }
+
+  return null;
+}
+
+function describeAutosave(layout){
+  const savedAt = layout.savedAt ? new Date(layout.savedAt) : null;
+  const label = savedAt && !Number.isNaN(savedAt.getTime())
+    ? savedAt.toLocaleString("da-DK")
+    : "unknown";
+
+  const state = layout.state || {};
+  return `
+    <strong>Sidst gemt:</strong> ${label}<br>
+    <strong>Size:</strong> ${state.canvasWidthM || "?"} × ${state.canvasHeightM || "?"} m<br>
+    <strong>Content:</strong> ${(state.items || []).length} booths · ${(state.textBoxes || []).length} text boxes · ${(state.walls || []).length} walls
+  `;
+}
+
+function tryRestoreAutosave(){
+  pendingAutosaveLayout = getLatestAutosave();
+  if (!pendingAutosaveLayout) return;
+
+  const dialog = document.getElementById("autosaveDialog");
+  const details = document.getElementById("autosaveDetails");
+
+  if (details) details.innerHTML = describeAutosave(pendingAutosaveLayout);
+  if (dialog) dialog.style.display = "flex";
+}
+
+function restoreAutosaveFromDialog(){
+  if (!pendingAutosaveLayout) return;
+  document.getElementById("autosaveDialog").style.display = "none";
+  applyLayoutState(pendingAutosaveLayout);
+  pendingAutosaveLayout = null;
+}
+
+function startFreshFromAutosaveDialog(){
+  document.getElementById("autosaveDialog").style.display = "none";
+  pendingAutosaveLayout = null;
+}
+
+function deleteAutosaveFromDialog(){
+  if (pendingAutosaveLayout && pendingAutosaveLayout.layoutId) {
+    localStorage.removeItem(getAutosaveKey(pendingAutosaveLayout.layoutId));
+    writeAutosaveIndex(readAutosaveIndex().filter(entry => entry.layoutId !== pendingAutosaveLayout.layoutId));
+  }
+
+  document.getElementById("autosaveDialog").style.display = "none";
+  pendingAutosaveLayout = null;
+}
+
+function loadLayoutFile(file){
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const layout = JSON.parse(reader.result);
+      applyLayoutState(layout);
+    } catch (err) {
+      alert("The layout file could not be loaded. Please select a valid Expo Planner .json file.");
+      console.error(err);
+    } finally {
+      fileInput.value = "";
+    }
+  };
+  reader.onerror = () => {
+    alert("The file could not be read.");
+    fileInput.value = "";
+  };
+  reader.readAsText(file);
+}
+
+fileInput.addEventListener("change", e => loadLayoutFile(e.target.files[0]));
+
+function showNew(){
+  document.getElementById("newSetup").style.display="flex";
+}
+
+function togglePaint(){
+  paintMode = !paintMode;
+  wallMode = false;
+
+  paintBtn.classList.toggle("paint-active",paintMode);
+  wallBtn.classList.remove("wall-active");
+
+  canvas.classList.toggle("canvas-paint",paintMode);
+
+  render();
+}
+
+
+function toggleGridPipette(){
+  pickGridColorMode = !pickGridColorMode;
+  paintMode = false;
+  wallMode = false;
+
+  const btn = document.getElementById("gridPipetteBtn");
+  if (btn) btn.classList.toggle("paint-active", pickGridColorMode);
+
+  paintBtn.classList.remove("paint-active");
+  wallBtn.classList.remove("wall-active");
+  canvas.classList.remove("canvas-paint");
+}
+
+/* ✅ NEW */
+function toggleWall(){
+  wallMode = !wallMode;
+  paintMode = false;
+
+  wallBtn.classList.toggle("wall-active", wallMode);
+  paintBtn.classList.remove("paint-active");
+
+  canvas.classList.remove("canvas-paint");
+}
+
+function updateFigureNamesButton(){
+  if (!window.namesBtn) return;
+  namesBtn.classList.toggle("names-active", showFigureNames);
+  namesBtn.textContent = showFigureNames ? "🔤 Labels" : "🔤 Labels hidden";
+}
+
+function toggleFigureNames(){
+  showFigureNames = !showFigureNames;
+  updateFigureNamesButton();
+  render();
+}
+
+function resizeNameInput(input, item){
+  const text = input.value || input.placeholder || "";
+  const mirror = document.createElement("span");
+  mirror.style.position = "absolute";
+  mirror.style.visibility = "hidden";
+  mirror.style.whiteSpace = "pre";
+  mirror.style.fontFamily = getComputedStyle(input).fontFamily;
+  mirror.style.fontSize = getComputedStyle(input).fontSize;
+  mirror.style.fontWeight = getComputedStyle(input).fontWeight;
+  mirror.textContent = text || " ";
+  document.body.appendChild(mirror);
+
+  const wantedWidth = Math.ceil(mirror.getBoundingClientRect().width) + 1;
+  mirror.remove();
+
+  input.style.width = Math.max(6, wantedWidth) + "px";
+}
+
+function ensureFigureLabelPosition(item, input){
+  if (item.labelX === null || item.labelX === undefined) {
+    const width = input ? input.offsetWidth || parseFloat(input.style.width) || 120 : 120;
+    item.labelX = Math.round((item.w - width) / 2);
+  }
+  if (item.labelY === null || item.labelY === undefined) item.labelY = -34;
+}
+
+function constrainFigureLabelPosition(item, labelX, labelY, input){
+  const maxDistance = GRID_SIZE * 3; // 3 meter fra figurens centrum.
+  const labelWidth = input ? input.offsetWidth || parseFloat(input.style.width) || 120 : 120;
+  const labelHeight = input ? input.offsetHeight || parseFloat(input.style.height) || 24 : 24;
+
+  const itemCenterX = item.x + item.w / 2;
+  const itemCenterY = item.y + item.h / 2;
+  let labelCenterX = item.x + labelX + labelWidth / 2;
+  let labelCenterY = item.y + labelY + labelHeight / 2;
+
+  const dx = labelCenterX - itemCenterX;
+  const dy = labelCenterY - itemCenterY;
+  const distance = Math.sqrt(dx * dx + dy * dy);
+
+  if (distance > maxDistance && distance > 0) {
+    const scale = maxDistance / distance;
+    labelCenterX = itemCenterX + dx * scale;
+    labelCenterY = itemCenterY + dy * scale;
+    labelX = labelCenterX - item.x - labelWidth / 2;
+    labelY = labelCenterY - item.y - labelHeight / 2;
+  }
+
+  return { labelX, labelY };
+}
+
+function applyFigureLabelPosition(input, item){
+  ensureFigureLabelPosition(item, input);
+  const constrained = constrainFigureLabelPosition(item, item.labelX, item.labelY, input);
+  item.labelX = constrained.labelX;
+  item.labelY = constrained.labelY;
+  input.style.left = item.labelX + "px";
+  input.style.top = item.labelY + "px";
+}
+
+function startFigureLabelDrag(e, input, item){
+  if (!input.readOnly) {
+    e.stopPropagation();
+    return;
+  }
+
+  e.preventDefault();
+  e.stopPropagation();
+  pushUndo();
+
+  selectedId = item.id;
+  selectedTextId = null;
+  selectedWallIds.clear();
+  input.focus();
+  draggingFigureLabel = true;
+  currentLabelItem = item;
+  currentLabelInput = input;
+
+  const canvasRect = canvas.getBoundingClientRect();
+  const mouseX = e.clientX - canvasRect.left;
+  const mouseY = e.clientY - canvasRect.top;
+  labelDragOffsetX = mouseX - item.x - (item.labelX || 0);
+  labelDragOffsetY = mouseY - item.y - (item.labelY || 0);
+}
+
+function startEditingFigureLabel(input, item){
+  selectedId = item.id;
+  selectedTextId = null;
+  selectedWallIds.clear();
+  input.readOnly = false;
+  input.classList.add("editing-label");
+  input.style.cursor = "text";
+  input.focus();
+  input.select();
+}
+
+function stopEditingFigureLabel(input){
+  input.readOnly = true;
+  input.classList.remove("editing-label");
+  input.style.cursor = "move";
+}
+
+
+function updateCanvasSize(){
+  canvas.style.width = canvasWidthM * GRID_SIZE + "px";
+  canvas.style.height = canvasHeightM * GRID_SIZE + "px";
+}
+
+function initCanvas(){
+  currentLayoutId = null;
+  getOrCreateLayoutId();
+
+  canvasWidthM = parseInt(widthInput.value)||10;
+  canvasHeightM = parseInt(heightInput.value)||10;
+
+  updateCanvasSize();
+  setup.style.display="none";
+  toolbar.style.display="flex";
+    document.getElementById("newSheetBtn").style.display = "block";
+  render();
+}
+
+function addBox(){
+  pushUndo();
+  const item = {
+    id: nextId++,
+    x: 0, y: 0, w: 80, h: 80,
+    angle: 0,
+    name: "New Booth",
+    labelX: null,
+    labelY: -34,
+    labelHidden: false,
+    color: "#3b82f6"
+  };
+  items.push(item);
+  selectedId = item.id;
+  selectedWallIds.clear();
+  selectedTextId = null;
+  render();
+  saveAutosaveNow();
+}
+
+
+function addTextBox(){
+  pushUndo();
+  const textBox = {
+    id: nextTextId++,
+    x: 0,
+    y: 0,
+    text: "Ny tekst"
+  };
+  textBoxes.push(textBox);
+  selectedTextId = textBox.id;
+  selectedId = null;
+  selectedWallIds.clear();
+  render();
+  saveAutosaveNow();
+}
+
+function getSelectedItem(){
+  return items.find(i => i.id === selectedId) || null;
+}
+
+function copySelectedItem(){
+  const item = getSelectedItem();
+  if (!item) return false;
+
+  copiedItem = clonePlain(item);
+  return true;
+}
+
+function pasteCopiedItem(){
+  if (!copiedItem) return;
+
+  pushUndo();
+
+  const item = clonePlain(copiedItem);
+  item.id = nextId++;
+
+  // Læg kopien én grid-celle forskudt, så man tydeligt kan se den.
+  item.x = (item.x || 0) + GRID_SIZE;
+  item.y = (item.y || 0) + GRID_SIZE;
+
+  clampItemSizeToCanvas(item);
+  clampItemToCanvas(item);
+
+  // Hvis kopien rammer kanten og ender præcis oven på originalen, prøv modsat retning.
+  if (copiedItem.x === item.x && copiedItem.y === item.y) {
+    item.x = Math.max(0, (copiedItem.x || 0) - GRID_SIZE);
+    item.y = Math.max(0, (copiedItem.y || 0) - GRID_SIZE);
+    clampItemToCanvas(item);
+  }
+
+  items.push(item);
+  selectedId = item.id;
+  selectedWallIds.clear();
+  render();
+}
+
+function duplicateSelectedItem(){
+  if (!copySelectedItem()) return;
+  pasteCopiedItem();
+}
+
+
+function updateShapeColorPicker(){
+  // Farvevælgeren ligger nu direkte på den markerede figur.
+}
+
+function setSelectedShapeColor(color){
+  const item = getSelectedItem();
+  if (!item) return;
+  pushUndo();
+  item.color = color;
+  render();
+}
+
+function removeSelected(){
+  if (selectedId === null && selectedTextId === null && !selectedWallIds.size) return;
+  pushUndo();
+  items = items.filter(i => i.id !== selectedId);
+
+  if (selectedTextId !== null) {
+    textBoxes = textBoxes.filter(t => t.id !== selectedTextId);
+    selectedTextId = null;
+  }
+
+  if (selectedWallIds.size) {
+    walls = walls.filter(w => !selectedWallIds.has(w.id));
+    selectedWallIds.clear();
+  }
+
+  selectedId = null;
+  render();
+  saveAutosaveNow();
+}
+
+
+function hexToRgba(hex, alpha){
+  if (!hex || typeof hex !== "string") return hex;
+
+  let value = hex.trim();
+
+  if (value.startsWith("#")) value = value.slice(1);
+
+  if (value.length === 3) {
+    value = value.split("").map(ch => ch + ch).join("");
+  }
+
+  if (value.length !== 6) return hex;
+
+  const r = parseInt(value.slice(0, 2), 16);
+  const g = parseInt(value.slice(2, 4), 16);
+  const b = parseInt(value.slice(4, 6), 16);
+
+  if ([r, g, b].some(Number.isNaN)) return hex;
+
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+
+function paintAtEvent(e){
+  const { gx, gy } = getGridCellFromEvent(e);
+
+  const x = gx * GRID_SIZE;
+  const y = gy * GRID_SIZE;
+
+  const key = x + "," + y;
+
+  if (activePaintKeys.has(key)) return;
+  activePaintKeys.add(key);
+
+  if (e.shiftKey) {
+    delete paintedCells[key];
+  } else {
+    paintedCells[key] = paintColor;
+  }
+
+  render();
+}
+
+
+function pickColorFromGridEvent(e){
+  const { gx, gy } = getGridCellFromEvent(e);
+  const key = (gx * GRID_SIZE) + "," + (gy * GRID_SIZE);
+  const originalColor = paintedCells[key];
+
+  if (originalColor) {
+    paintColor = originalColor;
+    if (paintColorInput) paintColorInput.value = originalColor;
+    return true;
+  }
+
+  return false;
+}
+
+function getGridCellFromEvent(e){
+  const r = canvas.getBoundingClientRect();
+  const gx = Math.max(0, Math.min(canvasWidthM - 1, Math.floor((e.clientX - r.left) / GRID_SIZE)));
+  const gy = Math.max(0, Math.min(canvasHeightM - 1, Math.floor((e.clientY - r.top) / GRID_SIZE)));
+  return { gx, gy };
+}
+
+function normalizePaintRect(a, b){
+  const x1 = Math.min(a.gx, b.gx);
+  const y1 = Math.min(a.gy, b.gy);
+  const x2 = Math.max(a.gx, b.gx);
+  const y2 = Math.max(a.gy, b.gy);
+  return { x1, y1, x2, y2 };
+}
+
+function applyPaintRect(rect, erase){
+  if (!rect) return;
+
+  for (let gy = rect.y1; gy <= rect.y2; gy++) {
+    for (let gx = rect.x1; gx <= rect.x2; gx++) {
+      const key = (gx * GRID_SIZE) + "," + (gy * GRID_SIZE);
+      if (erase) {
+        delete paintedCells[key];
+      } else {
+        paintedCells[key] = paintColor;
+      }
+    }
+  }
+}
+
+function drawPaintRectPreview(rect, erase){
+  if (!rect) return;
+
+  const d = document.createElement("div");
+  d.className = "paint-rect-preview" + (erase ? " erase" : "");
+  d.style.left = (rect.x1 * GRID_SIZE) + "px";
+  d.style.top = (rect.y1 * GRID_SIZE) + "px";
+  d.style.width = ((rect.x2 - rect.x1 + 1) * GRID_SIZE) + "px";
+  d.style.height = ((rect.y2 - rect.y1 + 1) * GRID_SIZE) + "px";
+  canvas.appendChild(d);
+}
+
+/* ✅ BETTER POINTER-BASED DRAWING */
+function getCanvasPoint(e){
+  const r = canvas.getBoundingClientRect();
+  return {
+    x: snap(e.clientX - r.left),
+    y: snap(e.clientY - r.top)
+  };
+}
+
+function clampPointToCanvas(p){
+  return {
+    x: Math.max(0, Math.min(p.x, canvas.offsetWidth)),
+    y: Math.max(0, Math.min(p.y, canvas.offsetHeight))
+  };
+}
+
+function clampItemToCanvas(item){
+  const maxX = Math.max(0, canvas.offsetWidth - item.w);
+  const maxY = Math.max(0, canvas.offsetHeight - item.h);
+
+  item.x = Math.max(0, Math.min(item.x, maxX));
+  item.y = Math.max(0, Math.min(item.y, maxY));
+}
+
+function clampItemSizeToCanvas(item){
+  const maxW = Math.max(GRID_SIZE, canvas.offsetWidth - item.x);
+  const maxH = Math.max(GRID_SIZE, canvas.offsetHeight - item.y);
+
+  item.w = Math.max(GRID_SIZE / 2, Math.min(item.w, maxW));
+  item.h = Math.max(GRID_SIZE / 2, Math.min(item.h, maxH));
+}
+
+function normalizeWall(start, end){
+  let nx = end.x;
+  let ny = end.y;
+
+  // Hold walls enten vandrette eller lodrette.
+  if (Math.abs(nx - start.x) >= Math.abs(ny - start.y)) {
+    ny = start.y;
+  } else {
+    nx = start.x;
+  }
+
+  return { x1:start.x, y1:start.y, x2:nx, y2:ny };
+}
+
+function finishWallDrawing(){
+  if (drawingWall && wallPreview) {
+    const length = Math.abs(wallPreview.x2 - wallPreview.x1) + Math.abs(wallPreview.y2 - wallPreview.y1);
+
+    // Undgå at gemme en usynlig væg ved klik uden træk.
+    if (length >= GRID_SIZE) {
+      pushUndo();
+      walls.push({ id: nextWallId++, ...wallPreview });
+    }
+  }
+
+  drawingWall = false;
+  wallPreview = null;
+  wallStart = null;
+  render();
+}
+
+function startWallDrawing(e){
+  const p = clampPointToCanvas(getCanvasPoint(e));
+  e.preventDefault();
+  canvas.setPointerCapture(e.pointerId);
+  drawingWall = true;
+  wallStart = p;
+  wallPreview = { x1:p.x, y1:p.y, x2:p.x, y2:p.y };
+  selectedWallIds.clear();
+  render();
+}
+
+canvas.addEventListener("pointerdown", (e) => {
+  if (e.button !== 0) return;
+  if (e.target !== canvas) return;
+
+  const p = clampPointToCanvas(getCanvasPoint(e));
+
+  if (pickGridColorMode) {
+    const { gx, gy } = getGridCellFromEvent(e);
+    const key = (gx * GRID_SIZE) + "," + (gy * GRID_SIZE);
+    const originalColor = paintedCells[key];
+
+    if (originalColor) {
+      paintColor = originalColor;
+      paintColorInput.value = originalColor;
+      pickGridColorMode = false;
+      const btn = document.getElementById("gridPipetteBtn");
+      if (btn) btn.classList.remove("paint-active");
+    }
+
+    e.preventDefault();
+    return;
+  }
+
+  if (!paintMode && !wallMode) {
+    selectedWallIds.clear();
+    selectedId = null;
+    selectedTextId = null;
+    render();
+  }
+
+  if (paintMode) {
+    pushUndo();
+    activePaintKeys.clear();
+    canvas.setPointerCapture(e.pointerId);
+
+    if (e.ctrlKey || e.metaKey) {
+      e.preventDefault();
+      paintingRect = true;
+      isPainting = false;
+      paintRectErase = e.shiftKey;
+      paintRectStart = getGridCellFromEvent(e);
+      paintRectPreview = normalizePaintRect(paintRectStart, paintRectStart);
+      render();
+    } else {
+      isPainting = true;
+      paintAtEvent(e);
+    }
+
+    return;
+  }
+
+  if (wallMode) {
+    startWallDrawing(e);
+  }
+});
+
+canvas.addEventListener("pointermove", (e) => {
+  if (paintMode && paintingRect && paintRectStart) {
+    paintRectPreview = normalizePaintRect(paintRectStart, getGridCellFromEvent(e));
+    render();
+    return;
+  }
+
+  if (paintMode && isPainting) {
+    paintAtEvent(e);
+    return;
+  }
+
+  if (wallMode && drawingWall && wallStart) {
+    const p = clampPointToCanvas(getCanvasPoint(e));
+    wallPreview = normalizeWall(wallStart, p);
+    render();
+  }
+});
+
+canvas.addEventListener("pointerup", (e) => {
+  if (canvas.hasPointerCapture(e.pointerId)) {
+    canvas.releasePointerCapture(e.pointerId);
+  }
+
+  if (paintingRect) {
+    applyPaintRect(paintRectPreview, paintRectErase);
+    paintingRect = false;
+    paintRectStart = null;
+    paintRectPreview = null;
+    paintRectErase = false;
+    render();
+  }
+
+  if (drawingWall) finishWallDrawing();
+
+  draggingTextBox=false;
+  currentTextBox=null;
+  draggingTextBox=false;
+  currentTextBox=null;
+  draggingTextBox=false;
+  currentTextBox=null;
+  draggingTextBox=false;
+  currentTextBox=null;
+  draggingFigureLabel=false;
+  currentLabelItem=null;
+  currentLabelInput=null;
+  dragging=false;
+  resizing=false;
+  rotating=false;
+  currentItem=null;
+  isPainting=false;
+  activePaintKeys.clear();
+});
+
+canvas.addEventListener("pointercancel", (e) => {
+  if (canvas.hasPointerCapture(e.pointerId)) {
+    canvas.releasePointerCapture(e.pointerId);
+  }
+
+  drawingWall=false;
+  wallPreview=null;
+  wallStart=null;
+  draggingTextBox=false;
+  currentTextBox=null;
+  draggingTextBox=false;
+  currentTextBox=null;
+  draggingTextBox=false;
+  currentTextBox=null;
+  draggingTextBox=false;
+  currentTextBox=null;
+  draggingFigureLabel=false;
+  currentLabelItem=null;
+  currentLabelInput=null;
+  dragging=false;
+  resizing=false;
+  rotating=false;
+  currentItem=null;
+  isPainting=false;
+  paintingRect=false;
+  paintRectStart=null;
+  paintRectPreview=null;
+  paintRectErase=false;
+  activePaintKeys.clear();
+  render();
+});
+
+// Fallback hvis brugeren slipper musen uden for browser-vinduet.
+document.addEventListener("mouseup", () => {
+  if (paintingRect) {
+    applyPaintRect(paintRectPreview, paintRectErase);
+    paintingRect = false;
+    paintRectStart = null;
+    paintRectPreview = null;
+    paintRectErase = false;
+    render();
+  }
+
+  if (drawingWall) finishWallDrawing();
+
+  draggingTextBox=false;
+  currentTextBox=null;
+  draggingTextBox=false;
+  currentTextBox=null;
+  draggingTextBox=false;
+  currentTextBox=null;
+  draggingTextBox=false;
+  currentTextBox=null;
+  draggingFigureLabel=false;
+  currentLabelItem=null;
+  currentLabelInput=null;
+  dragging=false;
+  resizing=false;
+  rotating=false;
+  currentItem=null;
+  isPainting=false;
+  activePaintKeys.clear();
+});
+
+document.addEventListener("keydown", e => {
+  const isTextField = e.target.matches("input, textarea");
+
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") {
+    if (!isTextField) {
+      e.preventDefault();
+      undoLastAction();
+    }
+    return;
+  }
+
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "c") {
+    if (!isTextField && selectedId !== null) {
+      e.preventDefault();
+      copySelectedItem();
+    }
+    return;
+  }
+
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "v") {
+    if (!isTextField && copiedItem) {
+      e.preventDefault();
+      pasteCopiedItem();
+    }
+    return;
+  }
+
+  if (!isTextField && e.key.toLowerCase() === "l" && selectedId !== null) {
+    const item = items.find(i => i.id === selectedId);
+    if (item && item.labelHidden) {
+      e.preventDefault();
+      pushUndo();
+      item.labelHidden = false;
+      if (!item.name) item.name = "New Booth";
+      render();
+      saveAutosaveNow();
+    }
+    return;
+  }
+
+  const selectedLabelInput = document.activeElement && document.activeElement.classList && document.activeElement.classList.contains("name-input")
+    ? document.activeElement
+    : null;
+
+  if (selectedLabelInput && selectedLabelInput.readOnly && (e.key === "Delete" || e.key === "Backspace")) {
+    const item = items.find(i => i.id === selectedId);
+    if (item) {
+      e.preventDefault();
+      pushUndo();
+      item.labelHidden = true;
+      render();
+      saveAutosaveNow();
+    }
+    return;
+  }
+
+  if (isTextField) return;
+
+  if (e.key === "Delete" || e.key === "Backspace") {
+    if (selectedWallIds.size) {
+      e.preventDefault();
+      pushUndo();
+      walls = walls.filter(w => !selectedWallIds.has(w.id));
+      selectedWallIds.clear();
+      render();
+      return;
+    }
+
+    if (selectedTextId !== null) {
+      e.preventDefault();
+      removeSelected();
+      return;
+    }
+
+    if (selectedId !== null) {
+      e.preventDefault();
+      removeSelected();
+    }
+  }
+});
+
+document.addEventListener("mousemove", e=>{
+  if(!currentItem && !currentTextBox && !currentLabelItem) return;
+  const r = canvas.getBoundingClientRect();
+  const x = e.clientX - r.left;
+  const y = e.clientY - r.top;
+
+  if(draggingFigureLabel && currentLabelItem){
+    const nextLabelX = x - currentLabelItem.x - labelDragOffsetX;
+    const nextLabelY = y - currentLabelItem.y - labelDragOffsetY;
+    const constrained = constrainFigureLabelPosition(currentLabelItem, nextLabelX, nextLabelY, currentLabelInput);
+    currentLabelItem.labelX = constrained.labelX;
+    currentLabelItem.labelY = constrained.labelY;
+    render();
+    return;
+  }
+
+  if(draggingTextBox && currentTextBox){
+    currentTextBox.x = Math.max(0, Math.min(x - textDragOffsetX, canvas.offsetWidth - 20));
+    currentTextBox.y = Math.max(0, Math.min(y - textDragOffsetY, canvas.offsetHeight - 20));
+    render();
+    return;
+  }
+
+  if(dragging){
+    currentItem.x = snapItemPosition(x - currentItem.w/2, currentItem, e);
+    currentItem.y = snapItemPosition(y - currentItem.h/2, currentItem, e);
+    clampItemToCanvas(currentItem);
+    render();
+  }
+
+  if(resizing){
+    const minSize = getItemSnapSize(currentItem, e);
+    currentItem.w = Math.max(minSize, snapItemSize(x - currentItem.x, currentItem, e));
+    currentItem.h = Math.max(minSize, snapItemSize(y - currentItem.y, currentItem, e));
+    clampItemSizeToCanvas(currentItem);
+    render();
+  }
+
+  if(rotating){
+    const cx = currentItem.x + currentItem.w/2;
+    const cy = currentItem.y + currentItem.h/2;
+
+    const mouseAngle = Math.atan2(y - cy, x - cx) * 180 / Math.PI;
+    const delta = mouseAngle - rotationStartMouseAngle;
+
+    let newAngle = rotationStartItemAngle + delta;
+
+    // Snap til 15 grader som standard. Hold Shift nede for fri rotation.
+    if(!e.shiftKey){
+      newAngle = Math.round(newAngle / 15) * 15;
+    }
+
+    currentItem.angle = newAngle;
+    render();
+  }
+});
+
+function formatMeters(px){
+  const meters = px * PX_TO_METER;
+  return Number.isInteger(meters) ? String(meters) : meters.toFixed(1);
+}
+
+function getItemSizeText(item){
+  return `${formatMeters(item.w)} m × ${formatMeters(item.h)} m`;
+}
+
+
+async function exportPNG(){
+  // Save the selected state so the export is clean without selections/handles.
+  const savedSelectedId = selectedId;
+  const savedSelectedWallIds = new Set(selectedWallIds);
+  selectedId = null;
+  selectedWallIds.clear();
+  render();
+
+  try {
+    // Wait briefly so the DOM can update before html2canvas takes the snapshot.
+    await new Promise(resolve => requestAnimationFrame(resolve));
+
+    if (document.fonts && document.fonts.ready) {
+      await document.fonts.ready;
+    }
+
+    const imageCanvas = await html2canvas(canvas, {
+      backgroundColor: "#ffffff",
+      scale: 2,
+      useCORS: true,
+      onclone: (clonedDocument) => {
+        // html2canvas kan beskære tekst inde i input-felter.
+        // Derfor erstatter vi kun i eksport-kopien inputfelterne med almindelige divs.
+        clonedDocument.querySelectorAll(".name-input").forEach(input => {
+          const text = clonedDocument.createElement("div");
+          text.className = "export-name-text";
+          text.textContent = input.value || input.getAttribute("value") || "";
+          text.style.cssText = input.style.cssText;
+          input.replaceWith(text);
+        });
+
+        
+        const copyright = clonedDocument.createElement("div");
+        copyright.className = "export-copyright-watermark";
+        copyright.textContent = "© Expo Planner - Mathias Andersen - mba@ptdefence.com";
+        clonedDocument.querySelector("#canvas").appendChild(copyright);
+
+clonedDocument.querySelectorAll(".text-box-input").forEach(input => {
+          const text = clonedDocument.createElement("div");
+          text.className = "export-text-box-text";
+          text.textContent = input.value || input.getAttribute("value") || "";
+          text.style.width = input.style.width || input.offsetWidth + "px";
+          input.replaceWith(text);
+        });
+      }
+    });
+
+    const link = document.createElement("a");
+    const now = new Date();
+    const stamp = now.toISOString().slice(0,19).replace(/[:T]/g,"-");
+    link.download = `expo-planner-${stamp}.png`;
+    link.href = imageCanvas.toDataURL("image/png");
+    link.click();
+    saveAutosaveNow();
+  } finally {
+    selectedId = savedSelectedId;
+    selectedWallIds = savedSelectedWallIds;
+    render();
+  }
+}
+
+function drawWall(w, preview){
+  const d=document.createElement("div");
+  d.className="wall";
+  if(w.id && selectedWallIds.has(w.id)) d.classList.add("selected-wall");
+  if(preview) d.style.opacity="0.5";
+
+  if (!preview) {
+    d.title = "Click to select wall. Press Delete to remove the selected wall.";
+    d.addEventListener("pointerdown", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+
+      // Vælg væg direkte — ingen Shift nødvendig.
+      selectedWallIds.clear();
+      selectedWallIds.add(w.id);
+      selectedId = null;
+      render();
+    });
+  }
+
+  if(w.x1===w.x2){
+    d.style.left=w.x1+"px";
+    d.style.top=Math.min(w.y1,w.y2)+"px";
+    d.style.width="4px";
+    d.style.height=Math.abs(w.y2-w.y1)+"px";
+  } else {
+    d.style.left=Math.min(w.x1,w.x2)+"px";
+    d.style.top=w.y1+"px";
+    d.style.width=Math.abs(w.x2-w.x1)+"px";
+    d.style.height="4px";
+  }
+
+  canvas.appendChild(d);
+}
+
+
+function updateTextInputWidth(input){
+  const text = input.value || input.placeholder || "";
+  const measure = document.createElement("canvas");
+  const ctx = measure.getContext("2d");
+  ctx.font = "13px Segoe UI, Arial, sans-serif";
+  const textWidth = Math.ceil(ctx.measureText(text).width);
+  input.style.width = Math.max(8, textWidth + 4) + "px";
+}
+
+function beginTextBoxDrag(e, tb){
+  e.preventDefault();
+  e.stopPropagation();
+
+  pushUndo();
+  draggingTextBox = true;
+  currentTextBox = tb;
+
+  const canvasRect = canvas.getBoundingClientRect();
+  textDragOffsetX = (e.clientX - canvasRect.left) - tb.x;
+  textDragOffsetY = (e.clientY - canvasRect.top) - tb.y;
+
+  selectedTextId = tb.id;
+  selectedId = null;
+  selectedWallIds.clear();
+
+  document.querySelectorAll(".text-box").forEach(box => box.classList.remove("selected-text"));
+  const boxEl = e.target.closest(".text-box");
+  if (boxEl) boxEl.classList.add("selected-text");
+}
+
+function startEditingTextBox(input, tb){
+  selectedTextId = tb.id;
+  selectedId = null;
+  selectedWallIds.clear();
+
+  input.readOnly = false;
+  input.classList.add("editing");
+  input.style.cursor = "text";
+  input.focus();
+  input.select();
+}
+
+function stopEditingTextBox(input){
+  input.readOnly = true;
+  input.classList.remove("editing");
+  input.style.cursor = "move";
+}
+
+function drawTextBox(tb){
+  if (!tb.id) tb.id = nextTextId++;
+
+  const el = document.createElement("div");
+  el.className = "text-box";
+  if (tb.id === selectedTextId) el.classList.add("selected-text");
+  el.style.left = tb.x + "px";
+  el.style.top = tb.y + "px";
+  el.title = "Drag to move. Double-click to edit. Press Delete to delete.";
+
+  const input = document.createElement("input");
+  input.className = "text-box-input";
+  input.type = "text";
+  input.value = tb.text || "";
+  input.placeholder = "Tekst";
+  input.readOnly = true;
+  updateTextInputWidth(input);
+
+  input.addEventListener("mousedown", e => {
+    if (input.readOnly) {
+      beginTextBoxDrag(e, tb);
+    } else {
+      e.stopPropagation();
+    }
+  });
+
+  function handleTextBoxDoubleClick(e){
+    e.preventDefault();
+    e.stopPropagation();
+    draggingTextBox = false;
+    currentTextBox = null;
+    startEditingTextBox(input, tb);
+  }
+
+  input.addEventListener("dblclick", handleTextBoxDoubleClick);
+  el.addEventListener("dblclick", handleTextBoxDoubleClick);
+
+  input.addEventListener("focus", () => {
+    if (input.readOnly) return;
+
+    if (input.dataset.undoStarted === "1") return;
+    input.dataset.undoStarted = "1";
+    pushUndo();
+  });
+
+  input.addEventListener("blur", () => {
+    input.dataset.undoStarted = "0";
+    stopEditingTextBox(input);
+  });
+
+  input.addEventListener("keydown", e => {
+    if (input.readOnly && e.key === "Enter") {
+      e.preventDefault();
+      startEditingTextBox(input, tb);
+      return;
+    }
+
+    if (!input.readOnly && (e.key === "Enter" || e.key === "Escape")) {
+      e.preventDefault();
+      input.blur();
+    }
+  });
+
+  input.addEventListener("input", e => {
+    tb.text = e.target.value;
+    updateTextInputWidth(input);
+    scheduleAutosave();
+  });
+
+  el.appendChild(input);
+
+  el.addEventListener("mousedown", e => {
+    beginTextBoxDrag(e, tb);
+  });
+
+  canvas.appendChild(el);
+}
+
+function render(){
+  updateShapeColorPicker();
+  canvas.innerHTML="";
+
+  if (paintMode) {
+    const overlay = document.createElement("div");
+    overlay.className = "canvas-overlay";
+    canvas.appendChild(overlay);
+  }
+
+  Object.entries(paintedCells).forEach(([key, color]) => {
+    const [x, y] = key.split(",").map(Number);
+
+    const cell = document.createElement("div");
+    cell.className = "painted-cell";
+    cell.style.left=x+"px";
+    cell.style.top=y+"px";
+    cell.style.width=GRID_SIZE+"px";
+    cell.style.height=GRID_SIZE+"px";
+
+    // Vis gridfarven transparent, så griddet stadig kan ses.
+    // Originalfarven gemmes separat og bruges af 🧪-pipetten.
+    cell.style.background = hexToRgba(color, 0.4);
+    cell.dataset.originalColor = color;
+
+    canvas.appendChild(cell);
+  });
+
+  if (paintRectPreview) {
+    drawPaintRectPreview(paintRectPreview, paintRectErase);
+  }
+
+  /* ✅ walls */
+  walls.forEach(w => { if (!w.id) w.id = nextWallId++; });
+  walls.forEach(w => drawWall(w,false));
+  if(wallPreview) drawWall(wallPreview,true);
+
+  textBoxes.forEach(tb => drawTextBox(tb));
+
+  items.forEach(item=>{
+    clampItemSizeToCanvas(item);
+    clampItemToCanvas(item);
+
+    const el=document.createElement("div");
+    el.className="box";
+    el.style.left=item.x+"px";
+    el.style.top=item.y+"px";
+    el.style.width=item.w+"px";
+    el.style.height=item.h+"px";
+    el.style.background=item.color;
+    el.style.transform=`rotate(${item.angle}deg)`;
+    el.title = item.labelHidden ? "Label er skjult. Vælg figuren og tryk L for at vise label igen." : "Drag to move booth.";
+
+    if(item.id===selectedId) el.classList.add("selected");
+
+    if (showFigureNames && !item.labelHidden) {
+      const nameInput = document.createElement("input");
+      nameInput.className = "name-input";
+      nameInput.type = "text";
+      nameInput.value = item.name || "";
+      nameInput.placeholder = "Booth Name";
+      nameInput.readOnly = true;
+      resizeNameInput(nameInput, item);
+      applyFigureLabelPosition(nameInput, item);
+
+      nameInput.title = "Drag to move label. Double-click to edit.";
+      nameInput.addEventListener("mousedown", e => startFigureLabelDrag(e, nameInput, item));
+      nameInput.addEventListener("click", e => e.stopPropagation());
+      nameInput.addEventListener("dblclick", e => {
+        e.preventDefault();
+        e.stopPropagation();
+        draggingFigureLabel = false;
+        currentLabelItem = null;
+        currentLabelInput = null;
+        startEditingFigureLabel(nameInput, item);
+      });
+      nameInput.addEventListener("focus", () => {
+        if (nameInput.readOnly) return;
+        if (nameInput.dataset.undoStarted === "1") return;
+        nameInput.dataset.undoStarted = "1";
+        pushUndo();
+      });
+      nameInput.addEventListener("blur", () => {
+        nameInput.dataset.undoStarted = "0";
+        stopEditingFigureLabel(nameInput);
+      });
+      nameInput.addEventListener("keydown", e => {
+        if (nameInput.readOnly && e.key === "Enter") {
+          e.preventDefault();
+          startEditingFigureLabel(nameInput, item);
+          return;
+        }
+        if (!nameInput.readOnly && (e.key === "Enter" || e.key === "Escape")) {
+          e.preventDefault();
+          nameInput.blur();
+        }
+      });
+      nameInput.addEventListener("input", e => {
+        item.name = e.target.value;
+        resizeNameInput(nameInput, item);
+        applyFigureLabelPosition(nameInput, item);
+        scheduleAutosave();
+      });
+      el.appendChild(nameInput);
+    }
+
+    const sizeLabel = document.createElement("div");
+    sizeLabel.className = "box-size";
+    const widthM = item.w * PX_TO_METER;
+    const heightM = item.h * PX_TO_METER;
+
+    if (widthM < 1 || heightM < 1) {
+      sizeLabel.style.display = "none";
+    } else {
+      sizeLabel.textContent = getItemSizeText(item);
+    }
+    el.appendChild(sizeLabel);
+
+    el.addEventListener("mousedown",(e)=>{
+      if(e.target.closest("input") || e.target.classList.contains("rotator")) return;
+      pushUndo();
+      dragging=true;
+      currentItem=item;
+      selectedId=item.id;
+      selectedTextId=null;
+      selectedWallIds.clear();
+      render();
+    });
+
+    const r=document.createElement("div");
+    r.className="resizer";
+    r.addEventListener("mousedown",(e)=>{
+      e.stopPropagation();
+      pushUndo();
+      resizing=true;
+      currentItem=item;
+      selectedId=item.id;
+      selectedTextId=null;
+    });
+
+    el.appendChild(r);
+
+    if(item.id===selectedId){
+      const colorInput = document.createElement("input");
+      colorInput.type = "color";
+      colorInput.className = "shape-color-inline";
+      colorInput.title = "Change booth color";
+      colorInput.value = item.color || "#3b82f6";
+      colorInput.addEventListener("mousedown", e => {
+        e.stopPropagation();
+        pushUndo();
+      });
+      colorInput.addEventListener("click", e => e.stopPropagation());
+      colorInput.addEventListener("input", e => {
+        item.color = e.target.value;
+        el.style.background = item.color;
+      });
+      colorInput.addEventListener("change", e => {
+        item.color = e.target.value;
+        render();
+      });
+      el.appendChild(colorInput);
+
+      const rot=document.createElement("div");
+      rot.className="rotator";
+
+      rot.addEventListener("mousedown",(e)=>{
+        e.stopPropagation();
+        e.preventDefault();
+
+        pushUndo();
+        rotating=true;
+        currentItem=item;
+
+        const r = canvas.getBoundingClientRect();
+        const x = e.clientX - r.left;
+        const y = e.clientY - r.top;
+
+        const cx = item.x + item.w/2;
+        const cy = item.y + item.h/2;
+
+        rotationStartMouseAngle = Math.atan2(y - cy, x - cx) * 180 / Math.PI;
+        rotationStartItemAngle = item.angle || 0;
+      });
+
+      el.appendChild(rot);
+    }
+
+    canvas.appendChild(el);
+  });
+
+  scheduleAutosave();
+}
+
+updateFigureNamesButton();
+
+function createNewSheet(){
+  document.getElementById("newSheetChoiceDialog").style.display = "flex";
+}
+
+function closeNewSheetChoice(){
+  document.getElementById("newSheetChoiceDialog").style.display = "none";
+}
+
+async function saveBeforeNewSheet(){
+  await saveLayout();
+  createNewSheetConfirmed();
+}
+
+function createNewSheetConfirmed(){
+  closeNewSheetChoice();
+
+  pushUndo();
+
+  currentLayoutId = null;
+  getOrCreateLayoutId();
+
+  items = [];
+  textBoxes = [];
+  walls = [];
+  paintedCells = {};
+  selectedId = null;
+  selectedTextId = null;
+  selectedWallIds.clear();
+
+  nextId = 1;
+  nextTextId = 1;
+  nextWallId = 1;
+
+  render();
+  saveAutosaveNow();
+}
+
+tryRestoreAutosave();
+</script>
+
+
+<footer id="footerCopyright">
+  © Expo Planner - Mathias Andersen - mba@ptdefence.com
+</footer>
+
+</body>
+</html>
